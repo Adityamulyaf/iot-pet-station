@@ -1,0 +1,7 @@
+/.runtime/
+/.venv/
+/.composer-local/
+/.composer-cache/
+**/__pycache__/
+*.pyc
+/artifacts/

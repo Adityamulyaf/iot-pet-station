@@ -1,0 +1,1 @@
+<div class="range-tabs" role="group" aria-label="Rentang waktu">@foreach(['1h'=>'1 jam','24h'=>'24 jam','7d'=>'7 hari'] as $value=>$label)<button wire:click="$set('range','{{ $value }}')" class="{{ $range === $value ? 'selected' : '' }}" aria-pressed="{{ $range === $value ? 'true' : 'false' }}">{{ $label }}</button>@endforeach</div>
