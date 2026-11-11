@@ -17,5 +17,6 @@ class DatabaseSeeder extends Seeder
         $user = User::query()->firstOrCreate(['email' => 'demo@petstation.local'], ['name' => 'Pemilik station', 'password' => Hash::make('petstation-local')]);
         Station::query()->firstOrCreate(['device_id' => 'station-001'], ['user_id' => $user->id, 'name' => 'Station ruang keluarga', 'location' => 'Ruang keluarga']);
         Station::query()->firstOrCreate(['device_id' => 'station-002'], ['user_id' => $user->id, 'name' => 'Station teras', 'location' => 'Teras belakang']);
+        Station::query()->firstOrCreate(['device_id' => 'station-esp32'], ['user_id' => $user->id, 'name' => 'Station ESP32', 'location' => 'Prototipe fisik', 'simulated' => false]);
     }
 }
