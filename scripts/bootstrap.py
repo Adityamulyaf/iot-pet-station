@@ -2,6 +2,7 @@
 import argparse
 import json
 import os
+import re
 import secrets
 import socket
 import subprocess
@@ -10,6 +11,43 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 RUNTIME = ROOT / '.runtime'
+PHYSICAL_DEVICE = 'station-esp32'
+FIRMWARE_SECRETS = ROOT / 'firmware' / 'petstation_esp32' / 'secrets.h'
+
+
+def lan_ip():
+    # Alamat untuk rute keluar; UDP connect tidak mengirim paket apa pun.
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as probe:
+        try:
+            probe.connect(('192.0.2.1', 9))
+            return probe.getsockname()[0]
+        except OSError:
+            return '127.0.0.1'
+
+
+def write_firmware_secrets(password, host):
+    wifi = {'WIFI_SSID': 'NAMA_WIFI', 'WIFI_PASSWORD': 'PASSWORD_WIFI'}
+    if FIRMWARE_SECRETS.exists():
+        current = FIRMWARE_SECRETS.read_text()
+        if re.search(r'#define MQTT_TLS 1\b', current):
+            # Berisi konfigurasi broker cloud dari deploy/setup-server.sh; jangan ditimpa.
+            return
+        for key in wifi:
+            match = re.search('#define ' + key + ' "(.*)"', current)
+            if match:
+                wifi[key] = match.group(1)
+    FIRMWARE_SECRETS.write_text(
+        '// Dibuat otomatis oleh scripts/bootstrap.py. Jangan di-commit.\n'
+        '// Isi WIFI_SSID dan WIFI_PASSWORD; nilainya dipertahankan saat bootstrap dijalankan ulang.\n'
+        '#pragma once\n'
+        f'#define WIFI_SSID "{wifi["WIFI_SSID"]}"\n'
+        f'#define WIFI_PASSWORD "{wifi["WIFI_PASSWORD"]}"\n'
+        f'#define MQTT_HOST "{host}"\n'
+        '#define MQTT_PORT 1883\n'
+        '#define MQTT_TLS 0\n'
+        f'#define DEVICE_ID "{PHYSICAL_DEVICE}"\n'
+        f'#define MQTT_PASSWORD "{password}"\n'
+    )
 
 
 def wait_port(port, seconds=20):
@@ -25,6 +63,7 @@ def wait_port(port, seconds=20):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--mysql-bin', default='C:/xampp/mysql/bin')
+    parser.add_argument('--lan', action='store_true', help='Buka broker MQTT di jaringan lokal untuk ESP32 fisik')
     args = parser.parse_args()
     mysql_bin = Path(args.mysql_bin)
     RUNTIME.mkdir(exist_ok=True)
@@ -34,6 +73,9 @@ def main():
         credentials = json.loads(credentials_path.read_text())
     else:
         credentials = {'database': secrets.token_hex(24), 'root': secrets.token_hex(24), 'backend': secrets.token_hex(24), 'devices': {device: secrets.token_hex(24) for device in ['station-001', 'station-002']}}
+        credentials_path.write_text(json.dumps(credentials, indent=2))
+    if PHYSICAL_DEVICE not in credentials['devices']:
+        credentials['devices'][PHYSICAL_DEVICE] = secrets.token_hex(24)
         credentials_path.write_text(json.dumps(credentials, indent=2))
     database = RUNTIME / 'mariadb'
     fresh = not (database / 'mysql').exists()
@@ -68,7 +110,9 @@ def main():
         acl.extend(['user ' + device, *['topic write petstation/' + device + '/' + kind for kind in ['telemetry', 'state', 'result']], *['topic read petstation/' + device + '/' + kind for kind in ['command', 'ack']], ''])
     (RUNTIME / 'mqtt-acl').write_text('\n'.join(acl))
     normalized = RUNTIME.as_posix()
-    (RUNTIME / 'mosquitto.conf').write_text(f'listener 1883 127.0.0.1\nallow_anonymous false\npassword_file {normalized}/mqtt-passwords\nacl_file {normalized}/mqtt-acl\npersistence false\nlog_type error\nlog_type warning\n')
+    listener = '0.0.0.0' if args.lan else '127.0.0.1'
+    write_firmware_secrets(credentials['devices'][PHYSICAL_DEVICE], lan_ip() if args.lan else '127.0.0.1')
+    (RUNTIME / 'mosquitto.conf').write_text(f'listener 1883 {listener}\nallow_anonymous false\npassword_file {normalized}/mqtt-passwords\nacl_file {normalized}/mqtt-acl\npersistence false\nlog_type error\nlog_type warning\n')
     env_path = ROOT / 'web' / '.env'
     env = env_path.read_text() if env_path.exists() else (ROOT / 'web' / '.env.example').read_text()
     updates = {'APP_NAME': 'Petstation', 'APP_URL': 'http://127.0.0.1:8000', 'DB_CONNECTION': 'mariadb', 'DB_HOST': '127.0.0.1', 'DB_PORT': '3307', 'DB_DATABASE': 'petstation', 'DB_USERNAME': 'petstation', 'DB_PASSWORD': credentials['database'], 'SESSION_DRIVER': 'file', 'CACHE_STORE': 'file', 'MQTT_HOST': '127.0.0.1', 'MQTT_PORT': '1883', 'MQTT_USERNAME': 'backend', 'MQTT_PASSWORD': credentials['backend'], 'MQTT_TLS': 'false'}

@@ -5,3 +5,5 @@
 **/__pycache__/
 *.pyc
 /artifacts/
+/firmware/**/secrets.h
+.history

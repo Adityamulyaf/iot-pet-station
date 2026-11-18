@@ -1,4 +1,4 @@
-param([string]$Php = '', [string]$Python = '', [switch]$SkipBuild)
+param([string]$Php = '', [string]$Python = '', [switch]$SkipBuild, [switch]$Lan)
 $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path $PSScriptRoot
 Set-Location -LiteralPath $projectRoot
@@ -24,9 +24,11 @@ function Test-LocalPort([int]$Port) {
     $client = New-Object System.Net.Sockets.TcpClient
     try { $client.Connect('127.0.0.1',$Port); return $true } catch { return $false } finally { $client.Dispose() }
 }
-& $Python scripts/bootstrap.py
+if ($Lan) { & $Python scripts/bootstrap.py --lan } else { & $Python scripts/bootstrap.py }
 if ($LASTEXITCODE -ne 0) { throw 'Persiapan layanan lokal gagal.' }
-$servicesFile = Join-Path $runtime 'services.json'
+$servicesDir = Join-Path $env:LOCALAPPDATA 'petstation'; New-Item -ItemType Directory -Force -Path $servicesDir | Out-Null
+# Di luar OneDrive agar file tidak terkunci saat sinkronisasi.
+$servicesFile = Join-Path $servicesDir 'services.json'
 $services = @{}
 if (Test-Path -LiteralPath $servicesFile) {
     $saved = Get-Content -LiteralPath $servicesFile -Raw | ConvertFrom-Json
@@ -39,7 +41,11 @@ function Start-LocalService([string]$Name,[string]$Executable,[string]$Arguments
     }
     $process = Start-Process -FilePath $Executable -ArgumentList $Arguments -WorkingDirectory $Directory -WindowStyle Hidden -RedirectStandardOutput (Join-Path $runtime "logs/$Name.out.log") -RedirectStandardError (Join-Path $runtime "logs/$Name.err.log") -PassThru
     $services[$Name] = @{ pid = $process.Id; started = $process.StartTime.ToUniversalTime().Ticks.ToString() }
-    $services | ConvertTo-Json -Depth 3 | Set-Content -LiteralPath $servicesFile
+    # OneDrive dapat mengunci file sesaat; coba ulang sebelum gagal.
+    for ($attempt = 1; $attempt -le 10; $attempt++) {
+        try { $services | ConvertTo-Json -Depth 3 | Set-Content -LiteralPath $servicesFile -ErrorAction Stop; break }
+        catch { if ($attempt -eq 10) { throw }; Start-Sleep -Milliseconds (200 * $attempt) }
+    }
 }
 function Test-OwnedService([string]$Name) {
     if (!$services.ContainsKey($Name)) { return $false }
@@ -68,3 +74,4 @@ foreach ($name in @('broker','worker','station-001','station-002','web')) {
 if (!(Test-LocalPort 8000)) { throw 'Server web belum siap. Periksa .runtime/logs/web.err.log.' }
 Write-Host 'Petstation lokal: http://127.0.0.1:8000'
 Write-Host 'Log layanan: .runtime/logs'
+if ($Lan) { Write-Host 'Broker MQTT terbuka di jaringan lokal. Konfigurasi ESP32: firmware/petstation_esp32/secrets.h' }

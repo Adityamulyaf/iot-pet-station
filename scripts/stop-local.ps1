@@ -1,6 +1,6 @@
 $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path $PSScriptRoot
-$servicesFile = Join-Path $projectRoot '.runtime/services.json'
+$servicesFile = Join-Path $env:LOCALAPPDATA 'petstation/services.json'
 if (Test-Path -LiteralPath $servicesFile) {
     $services = Get-Content -LiteralPath $servicesFile -Raw | ConvertFrom-Json
     foreach ($service in $services.PSObject.Properties) {
