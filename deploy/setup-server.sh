@@ -35,8 +35,9 @@ apt-get update -q
 apt-get install -y -q git curl unzip openssl python3 python3-venv \
   php8.3-cli php8.3-fpm php8.3-mysql php8.3-mbstring php8.3-xml php8.3-curl php8.3-zip php8.3-bcmath php8.3-intl \
   composer mariadb-server mosquitto caddy
-if ! node -v 2>/dev/null | grep -qE '^v(2[2-9]|[3-9][0-9])\.'; then
-  curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
+# Node 24 (npm 11) sama dengan lingkungan pembuat package-lock.json; npm 10 menolak lockfile tersebut.
+if ! node -v 2>/dev/null | grep -qE '^v(2[4-9]|[3-9][0-9])\.'; then
+  curl -fsSL https://deb.nodesource.com/setup_24.x | bash -
   apt-get install -y -q nodejs
 fi
 
