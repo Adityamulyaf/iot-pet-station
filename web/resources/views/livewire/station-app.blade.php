@@ -1,81 +1,181 @@
-<div class="app-shell" x-data="{ menuOpen: false }" wire:poll.5s>
-    <div class="mobile-overlay" x-show="menuOpen" x-cloak @click="menuOpen = false"></div>
-    <aside class="sidebar" :class="{ 'is-open': menuOpen }">
-        <a href="{{ route('stations') }}" class="brand"><span class="brand-mark"><x-icon name="grid"/></span>petstation<span class="brand-period">.</span></a>
-        <div class="workspace-label"><span class="workspace-icon">P</span><div><strong>Personal workspace</strong><small>Smart home</small></div></div>
-        <span class="nav-label">WORKSPACE</span>
-        <nav class="main-nav" aria-label="Navigasi utama">
-            <a href="{{ route('stations') }}" class="{{ !$station ? 'active' : '' }}"><x-icon name="station"/>Station saya <span class="nav-count">{{ $stations->count() }}</span></a>
+<div class="app" wire:poll.5s>
+    @php
+        $sections = ['dashboard' => 'Dashboard', 'history' => 'Riwayat', 'analytics' => 'Grafik', 'settings' => 'Pengaturan'];
+    @endphp
+    <header class="top">
+        <div class="top-row">
+            <a href="{{ route('stations') }}" class="brand"><x-icon name="food"/><span>petstation</span></a>
             @if($station)
-            @foreach(['dashboard'=>['grid','Dashboard'],'history'=>['clock','Riwayat'],'analytics'=>['chart','Analytics'],'settings'=>['settings','Pengaturan']] as $key=>$nav)
-            <a href="{{ route('station',[$station,$key]) }}" class="{{ $section === $key ? 'active' : '' }}" @if($section === $key) aria-current="page" @endif><x-icon :name="$nav[0]"/>{{ $nav[1] }}</a>
-            @endforeach
-            @endif
-        </nav>
-        <div class="sidebar-stations"><span class="nav-label">STATION ANDA</span>
-            @forelse($stations as $item)<a href="{{ route('station',[$item,'dashboard']) }}" class="sidebar-station {{ $station?->id === $item->id ? 'selected' : '' }}"><span class="dot {{ $item->online() ? 'green' : '' }}"></span><span>{{ $item->name }}</span></a>@empty<p class="small muted">Belum ada station.</p>@endforelse
-        </div>
-        <div class="sidebar-bottom">@php
-            $physicalStations = $stations->where('simulated', false);
-            $physicalOnline = $physicalStations->contains(fn ($item) => $item->online());
-        @endphp
-        <div class="local-card"><span class="dot {{ $physicalOnline ? 'green' : '' }}"></span><div><strong>Lingkungan lokal</strong><small>{{ $physicalOnline ? 'Perangkat fisik terhubung' : ($physicalStations->isNotEmpty() ? 'Perangkat fisik offline' : 'Pengembangan dengan simulator') }}</small></div></div>
-            <div class="account"><span class="avatar">{{ mb_substr(auth()->user()->name,0,1) }}</span><div><strong>{{ auth()->user()->name }}</strong><small>Akun personal</small></div><form action="{{ route('logout') }}" method="POST">@csrf<button class="icon-button" title="Keluar" aria-label="Keluar"><x-icon name="logout"/></button></form></div>
-        </div>
-    </aside>
-    <div class="app-body">
-        <header class="topbar"><div class="breadcrumb"><button class="icon-button mobile-menu" @click="menuOpen = true" aria-label="Buka navigasi"><x-icon name="menu"/></button><span>Workspace</span><x-icon name="chevron"/><strong>{{ !$station ? 'Station saya' : ['dashboard'=>'Dashboard','history'=>'Riwayat','analytics'=>'Analytics','settings'=>'Pengaturan'][$section] }}</strong></div><div class="topbar-right"><span class="timezone">Asia/Jakarta</span><span class="topbar-divider"></span><span class="avatar small-avatar">{{ mb_substr(auth()->user()->name,0,1) }}</span></div></header>
-        <main id="main-content" class="main-content">
-            @if($notice)<div class="toast" role="status"><x-icon name="check"/>{{ $notice }}<button class="icon-button" wire:click="$set('notice','')" aria-label="Tutup pemberitahuan"><x-icon name="close"/></button></div>@endif
-            @error('command')<div class="alert" role="alert">{{ $message }}</div>@enderror
-            @if(!$station)
-                <div class="page-heading"><div><span class="eyebrow">WORKSPACE ANDA</span><h1>Station saya</h1><p class="muted">Satu tempat untuk setiap station di rumah Anda.</p></div><span class="badge neutral">{{ $stations->count() }} station terdaftar</span></div>
-                <div class="station-grid">
-                    @forelse($stations as $item)
-                    <a class="station-card" href="{{ route('station',[$item,'dashboard']) }}"><div class="station-card-top"><span class="station-icon"><x-icon name="station"/></span><span class="badge {{ $item->online() ? 'success' : 'neutral' }}"><span class="dot"></span>{{ $item->online() ? 'Online' : 'Offline' }}</span></div><span class="eyebrow">{{ $item->location }}</span><h2>{{ $item->name }}</h2><p class="small muted">{{ $item->device_id }} @if($item->simulated) · Simulasi @endif</p><div class="station-card-metrics"><div><span>Pakan di wadah</span><strong>{{ $item->snapshot && ($item->snapshot['food_valid'] ?? false) ? number_format($item->snapshot['food_g'],0,',','.') : 'Belum tersedia' }} <small>{{ $item->snapshot && ($item->snapshot['food_valid'] ?? false) ? 'g' : '' }}</small></strong></div><div><span>Air di wadah</span><strong>{{ $item->snapshot && ($item->snapshot['water_valid'] ?? false) ? round($item->snapshot['water_pct']).'%' : 'Belum tersedia' }}</strong></div></div><div class="station-card-footer"><span>{{ $item->hasFreshTelemetry() ? 'Data terbaru' : 'Menunggu pembacaan terbaru' }}</span><x-icon name="arrow"/></div></a>
-                    @empty<div class="panel empty-state"><x-icon name="station"/><h2>Belum ada station</h2><p>Station yang sudah didaftarkan ke akun ini akan tampil di sini.</p></div>@endforelse
-                </div>
+                <div class="picker"><select aria-label="Pilih station" onchange="window.location.href=this.value">@foreach($stations as $item)<option value="{{ route('station',[$item,$section]) }}" @selected($item->id === $station->id)>{{ $item->name }}</option>@endforeach</select></div>
             @else
-                @php
-                    $data = $station->snapshot ?? [];
-                    $foodValid = $station->hasFreshTelemetry() && ($data['food_valid'] ?? false);
-                    $waterValid = $station->hasFreshTelemetry() && ($data['water_valid'] ?? false);
-                    $food = $data['food_g'] ?? 0; $water = $data['water_pct'] ?? 0;
-                    $serviceOnline = (bool) \Illuminate\Support\Facades\Cache::get('mqtt-worker-online');
-                    $ready = $station->online() && $station->hasFreshTelemetry() && $foodValid && $waterValid && !$busy && !$cooldown && $serviceOnline && ($station->actuators['servo'] ?? '') === 'closed' && ($station->actuators['pump'] ?? '') === 'off';
-                    $titles = ['dashboard'=>['PEMANTAUAN','Ringkasan station','Pantau isi wadah pakan dan air, lalu isi ulang dari jarak jauh.'],'history'=>['AKTIVITAS','Riwayat perintah','Setiap permintaan dan hasil perangkat, tercatat di sini.'],'analytics'=>['INSIGHT','Analytics wadah','Lihat perubahan isi wadah dari waktu ke waktu.'],'settings'=>['PREFERENSI','Pengaturan station','Kelola identitas station dan skenario pengujian.']];
-                @endphp
-                <div class="page-heading"><div><span class="eyebrow">{{ $titles[$section][0] }}</span><h1>{{ $titles[$section][1] }}</h1><p class="muted">{{ $titles[$section][2] }}</p></div><div class="station-picker"><x-icon name="station"/><select aria-label="Pilih station" onchange="window.location.href=this.value">@foreach($stations as $item)<option value="{{ route('station',[$item,$section]) }}" @selected($item->id === $station->id)>{{ $item->name }}</option>@endforeach</select></div></div>
-                <div class="station-strip"><div class="station-strip-info"><span class="badge {{ $station->online() ? 'success' : 'neutral' }}"><span class="dot"></span>{{ $station->online() ? 'Online' : 'Offline' }}</span><strong>{{ $station->name }}</strong><span class="strip-location">{{ $station->location }}</span>@if($station->simulated)<span class="simulation-label">Mode simulasi</span>@endif</div><span class="last-reading">{{ $station->telemetry_at ? 'Pembacaan '.$station->telemetry_at->timezone('Asia/Jakarta')->format('H:i:s').' WIB' : 'Belum ada pembacaan' }} @if($station->telemetry_at && !$station->hasFreshTelemetry())<span class="text-amber"> · Data terlambat</span>@endif</span></div>
-                @if(!$serviceOnline)<div class="alert subtle">Layanan perangkat belum terhubung. Data terakhir tetap ditampilkan dan kontrol dinonaktifkan.</div>@endif
-                @if($section === 'dashboard')
-                    <div class="metrics-grid">
-                        <article class="panel metric-card"><div class="metric-label"><span>Pakan di wadah</span><span class="metric-icon amber"><x-icon name="food"/></span></div><div class="metric-value">{{ isset($data['food_g']) ? number_format($food,0,',','.') : 'N/A' }} <span>gram</span></div><div class="meter"><span style="width:{{ min(100,max(0,$food/config('station.bowl_food_full_g')*100)) }}%" class="food-meter"></span></div><div class="metric-footer"><span>{{ !isset($data['food_g']) ? 'Menunggu data' : (!$foodValid ? 'Pembacaan tidak valid / terlambat' : ($food >= config('station.bowl_food_full_g') ? 'Wadah penuh' : ($food < 20 ? 'Wadah hampir kosong' : 'Wadah terisi'))) }}</span><span>Penuh {{ number_format(config('station.bowl_food_full_g'),0,',','.') }} g</span></div></article>
-                        <article class="panel metric-card"><div class="metric-label"><span>Air di wadah</span><span class="metric-icon mint"><x-icon name="water"/></span></div><div class="metric-value">{{ isset($data['water_pct']) ? round($water) : 'N/A' }} <span>% level</span></div><div class="meter"><span style="width:{{ min(100,max(0,$water)) }}%"></span></div><div class="metric-footer"><span>{{ !isset($data['water_pct']) ? 'Menunggu data' : (!$waterValid ? 'Pembacaan tidak valid / terlambat' : ($water >= config('station.bowl_water_full_pct') ? 'Wadah penuh' : ($water < 20 ? 'Wadah hampir kosong' : 'Wadah terisi'))) }}</span><span>Terkalibrasi</span></div></article>
-                        <article class="panel metric-card motion-card"><div class="metric-label"><span>Gerakan di area makan</span><span class="metric-icon neutral"><x-icon name="motion"/></span></div><div class="motion-value">{{ !$station->hasFreshTelemetry() ? 'Belum diketahui' : (($data['pir'] ?? false) ? 'Terdeteksi' : 'Tidak terdeteksi') }}</div><div class="motion-indicator"><span class="dot {{ $station->hasFreshTelemetry() && ($data['pir'] ?? false) ? 'green' : '' }}"></span><span>{{ $station->hasFreshTelemetry() ? 'Sensor PIR aktif' : 'Menunggu data terbaru' }}</span></div><p class="small muted">Mendeteksi gerakan, bukan aktivitas makan.</p></article>
-                    </div>
-                    <div class="dashboard-grid"><section class="panel chart-panel"><div class="panel-heading"><div><h2>Tren isi wadah</h2><p class="small muted">Rata-rata pembacaan sensor wadah</p></div>@include('partials.range')</div><div class="chart-legend"><span><i class="legend-dot food"></i>Pakan <small>(g)</small></span><span><i class="legend-dot water"></i>Air <small>(% level)</small></span></div>@include('partials.chart')</section>
-                        <section class="panel control-panel"><div class="panel-heading"><div><h2>Kontrol station</h2><p class="small muted">Satu tindakan dalam satu waktu</p></div><x-icon name="settings"/></div><div class="actuator-line"><span>Katup pakan</span><strong>{{ ['closed'=>'Tertutup','open'=>'Terbuka'][$station->actuators['servo'] ?? ''] ?? 'Belum diketahui' }}</strong></div><div class="actuator-line"><span>Pompa air</span><strong>{{ ['off'=>'Nonaktif','on'=>'Aktif'][$station->actuators['pump'] ?? ''] ?? 'Belum diketahui' }}</strong></div><div class="control-actions"><button class="button primary wide" wire:click="ask('feed')" @disabled(!$ready || $food >= config('station.bowl_food_full_g'))><x-icon name="food"/>Beri pakan<x-icon name="arrow"/></button><button class="button secondary wide" wire:click="ask('water')" @disabled(!$ready || $water >= config('station.bowl_water_full_pct'))><x-icon name="water"/>Salurkan air<x-icon name="arrow"/></button></div><p class="control-note">@if($busy)Menunggu hasil perintah sebelumnya. @elseif($cooldown)Cooldown aktif. Kontrol tersedia setelah 10 detik. @elseif(!$ready)Kontrol tersedia saat station dan sensor siap. @else Siklus dibatasi 2 detik. Konfirmasi diperlukan. @endif</p><div class="control-foot"><x-icon name="shield"/><span>State adalah laporan perangkat. Penyaluran fisik perlu diverifikasi.</span></div></section>
-                    </div>
-                    <section class="panel activity-panel"><div class="panel-heading"><div><h2>Aktivitas terbaru</h2><p class="small muted">Permintaan dan laporan dari station ini</p></div><a class="text-link" href="{{ route('station',[$station,'history']) }}">Lihat semua <x-icon name="arrow"/></a></div>@include('partials.commands')</section>
-                    <p class="data-note">Sensor mengukur isi wadah. Kenaikan setelah perintah mengonfirmasi penyaluran; penurunan bisa berarti dimakan, diminum, atau tumpah.</p>
-                @elseif($section === 'history')
-                    <section class="panel"><div class="filters"><div><label for="status-filter">Status</label><select id="status-filter" wire:model.live="statusFilter"><option value="">Semua status</option>@foreach(\App\Models\StationCommand::LABELS as $key=>$label)<option value="{{ $key }}">{{ $label }}</option>@endforeach</select></div><div><label for="action-filter">Tindakan</label><select id="action-filter" wire:model.live="actionFilter"><option value="">Semua tindakan</option><option value="feed">Beri pakan</option><option value="water">Salurkan air</option><option value="scenario">Ubah skenario</option></select></div><div><label for="date-filter">Tanggal (WIB)</label><input id="date-filter" type="date" wire:model.live="dateFilter"></div><button class="button secondary filter-reset" wire:click="$set('statusFilter',''); $set('actionFilter',''); $set('dateFilter','')">Reset filter</button></div>@include('partials.commands')<div class="pagination">{{ $commands->links() }}</div></section>
-                @elseif($section === 'analytics')
-                    <div class="analytics-summary">@foreach(['total'=>['Total perintah','permintaan'],'completed'=>['Siklus selesai','laporan perangkat'],'unconfirmed'=>['Belum terkonfirmasi','perintah'],'motion'=>['Pembacaan PIR aktif','sampel gerakan']] as $key=>$item)<article class="panel summary-card"><span class="muted small">{{ $item[0] }}</span><strong>{{ $stats[$key] }}</strong><span class="small muted">{{ $item[1] }}</span></article>@endforeach</div>
-                    <section class="panel chart-panel analytics-chart"><div class="panel-heading"><div><h2>Perubahan isi wadah</h2><p class="small muted">Pembacaan valid dikelompokkan berdasarkan rentang waktu</p></div>@include('partials.range')</div><div class="chart-legend"><span><i class="legend-dot food"></i>Pakan (g)</span><span><i class="legend-dot water"></i>Air (% level)</span></div>@include('partials.chart')</section><p class="data-note">Sampel PIR aktif tidak mewakili jumlah kunjungan. Penurunan isi wadah tidak membuktikan konsumsi hewan.</p>
-                @else
-                    <div class="settings-grid"><section class="panel settings-panel"><div class="panel-heading"><div><h2>Identitas station</h2><p class="small muted">Nama yang mudah dikenali di workspace Anda.</p></div></div><form wire:submit="saveStation" class="settings-form"><label for="station-name">Nama station</label><input id="station-name" wire:model="stationName" maxlength="80" required>@error('stationName')<span class="form-error">{{ $message }}</span>@enderror<label for="station-location">Lokasi</label><input id="station-location" wire:model="stationLocation" maxlength="80" required>@error('stationLocation')<span class="form-error">{{ $message }}</span>@enderror<div class="read-only-field"><span>Identitas perangkat</span><code>{{ $station->device_id }}</code></div><div class="read-only-field"><span>Jenis perangkat</span><strong>{{ $station->simulated ? 'Simulator' : 'Perangkat fisik' }}</strong></div><button class="button primary" type="submit" wire:loading.attr="disabled">Simpan perubahan</button></form></section>
-                    @if($station->simulated && app()->environment('local'))<section class="panel settings-panel"><div class="panel-heading"><div><h2>Skenario pengujian</h2><p class="small muted">Uji perilaku aplikasi tanpa perangkat fisik.</p></div><span class="badge neutral">Simulasi</span></div><form wire:submit="applyScenario" class="settings-form"><label for="scenario">Kondisi simulator</label><select id="scenario" wire:model="scenario"><option value="normal">Normal / pulihkan simulator</option><option value="low_water">Level air rendah</option><option value="invalid_sensor">Sensor tidak valid</option><option value="offline">Perangkat offline</option><option value="delayed">Hasil terlambat</option><option value="no_result">Hasil tidak diterima</option><option value="duplicate">Pesan duplikat</option></select><p class="small muted">Skenario aktif: {{ ['normal'=>'Normal','low_water'=>'Air rendah','invalid_sensor'=>'Sensor tidak valid','offline'=>'Offline','delayed'=>'Hasil terlambat','no_result'=>'Hasil tidak diterima','duplicate'=>'Pesan duplikat'][$station->scenario] ?? $station->scenario }}.</p><button class="button secondary" wire:loading.attr="disabled" @disabled(!$serviceOnline)>Terapkan skenario</button><div class="info-box">Pilih Normal untuk memulihkan simulator dan mengatur ulang isi wadah. Hasil terlambat menguji penanganan timeout, bukan durasi aktuator.</div></form></section>@endif</div>
-                @endif
+                <span class="picker"></span>
             @endif
-            <footer class="page-footer"><span>Petstation <span class="footer-dot">/</span> Smart home workspace</span><span>{{ now()->timezone('Asia/Jakarta')->translatedFormat('d M Y') }}</span></footer>
-        </main>
-    </div>
+            <form action="{{ route('logout') }}" method="POST">@csrf<button class="icon-button" title="Keluar" aria-label="Keluar"><x-icon name="logout"/></button></form>
+        </div>
+        @if($station)
+            <nav class="tabs" aria-label="Menu station">
+                @foreach($sections as $key => $label)
+                    <a href="{{ route('station',[$station,$key]) }}" class="{{ $section === $key ? 'active' : '' }}" @if($section === $key) aria-current="page" @endif>{{ $label }}</a>
+                @endforeach
+            </nav>
+        @endif
+    </header>
+
+    <main id="main-content" class="main">
+        @if($notice)<div class="toast" role="status"><x-icon name="check"/>{{ $notice }}<button class="icon-button" wire:click="$set('notice','')" aria-label="Tutup"><x-icon name="close"/></button></div>@endif
+        @error('command')<div class="alert" role="alert">{{ $message }}</div>@enderror
+
+        @if(!$station)
+            <h1>Station saya</h1>
+            <div class="stations">
+                @forelse($stations as $item)
+                    @php
+                        $snap = $item->snapshot ?? [];
+                        $itemFood = ($snap['food_valid'] ?? false) ? number_format($snap['food_g'], 0, ',', '.').' g' : '–';
+                        $itemWater = ($snap['water_valid'] ?? false) ? round($snap['water_pct']).'%' : '–';
+                    @endphp
+                    <a class="station-card" href="{{ route('station',[$item,'dashboard']) }}">
+                        <div class="station-card-top"><h2>{{ $item->name }}</h2><span class="pill {{ $item->online() ? 'on' : 'off' }}">{{ $item->online() ? 'Online' : 'Offline' }}</span></div>
+                        <div class="station-card-values"><div>Pakan<strong>{{ $itemFood }}</strong></div><div>Air<strong>{{ $itemWater }}</strong></div></div>
+                    </a>
+                @empty
+                    <div class="panel empty">Belum ada station di akun ini.</div>
+                @endforelse
+            </div>
+        @else
+            @php
+                $data = $station->snapshot ?? [];
+                $fresh = $station->hasFreshTelemetry();
+                $foodValid = $fresh && ($data['food_valid'] ?? false);
+                $waterValid = $fresh && ($data['water_valid'] ?? false);
+                $food = $data['food_g'] ?? 0;
+                $water = $data['water_pct'] ?? 0;
+                $foodFull = config('station.bowl_food_full_g');
+                $waterFull = config('station.bowl_water_full_pct');
+                $serviceOnline = (bool) \Illuminate\Support\Facades\Cache::get('mqtt-worker-online');
+                $ready = $station->online() && $fresh && $foodValid && $waterValid && !$busy && !$cooldown && $serviceOnline && ($station->actuators['servo'] ?? '') === 'closed' && ($station->actuators['pump'] ?? '') === 'off';
+                $hint = match (true) {
+                    $busy => 'Menunggu perintah sebelumnya selesai…',
+                    $cooldown => 'Tunggu 10 detik sebelum perintah berikutnya.',
+                    !$serviceOnline => 'Server perangkat terputus.',
+                    !$station->online() => 'Station offline.',
+                    !$fresh => 'Menunggu data terbaru.',
+                    !$foodValid || !$waterValid => 'Sensor tidak terbaca.',
+                    default => '',
+                };
+                $bowlNote = fn (bool $valid, float $value, float $full) => !$valid ? 'Tidak terbaca' : ($value >= $full ? 'Penuh' : ($value < 20 ? 'Hampir kosong' : ''));
+            @endphp
+
+            <div class="status-row">
+                <span class="pill {{ $station->online() ? 'on' : 'off' }}">{{ $station->online() ? 'Online' : 'Offline' }}</span>
+                @if($station->simulated)<span class="pill">Simulasi</span>@endif
+                @if($fresh && ($data['pir'] ?? false))<span class="pill warn">Ada gerakan</span>@endif
+                <span class="time">@if($station->telemetry_at){{ $fresh ? '' : 'Terlambat · ' }}{{ $station->telemetry_at->timezone('Asia/Jakarta')->format('H:i:s') }}@else Belum ada data @endif</span>
+            </div>
+
+            @if($section === 'dashboard')
+                <div class="tiles">
+                    <section class="tile food">
+                        <div class="tile-head"><x-icon name="food"/>Pakan</div>
+                        <div class="tile-value">{{ isset($data['food_g']) ? number_format($food,0,',','.') : '–' }}<small>g</small></div>
+                        <div class="bar"><span style="width:{{ min(100,max(0,$food/$foodFull*100)) }}%"></span></div>
+                        <div class="tile-note">{{ $bowlNote($foodValid, $food, $foodFull) }}</div>
+                        <button class="button wide" wire:click="ask('feed')" @disabled(!$ready || $food >= $foodFull)>Beri pakan</button>
+                    </section>
+                    <section class="tile water">
+                        <div class="tile-head"><x-icon name="water"/>Air</div>
+                        <div class="tile-value">{{ isset($data['water_pct']) ? round($water) : '–' }}<small>%</small></div>
+                        <div class="bar"><span style="width:{{ min(100,max(0,$water)) }}%"></span></div>
+                        <div class="tile-note">{{ $bowlNote($waterValid, $water, $waterFull) }}</div>
+                        <button class="button wide" wire:click="ask('water')" @disabled(!$ready || $water >= $waterFull)>Salurkan air</button>
+                    </section>
+                </div>
+                @if($hint)<p class="hint">{{ $hint }}</p>@endif
+
+                <section class="panel">
+                    <div class="panel-head"><h2>Aktivitas</h2><a href="{{ route('station',[$station,'history']) }}">Semua</a></div>
+                    @include('partials.commands')
+                </section>
+            @elseif($section === 'history')
+                <section class="panel">
+                    <div class="filters">
+                        <div><label for="status-filter">Status</label><select id="status-filter" wire:model.live="statusFilter"><option value="">Semua</option>@foreach(\App\Models\StationCommand::LABELS as $key=>$label)<option value="{{ $key }}">{{ $label }}</option>@endforeach</select></div>
+                        <div><label for="action-filter">Tindakan</label><select id="action-filter" wire:model.live="actionFilter"><option value="">Semua</option><option value="feed">Beri pakan</option><option value="water">Salurkan air</option><option value="scenario">Ubah skenario</option></select></div>
+                        <div><label for="date-filter">Tanggal</label><input id="date-filter" type="date" wire:model.live="dateFilter"></div>
+                        @if($statusFilter || $actionFilter || $dateFilter)<button class="button soft" wire:click="$set('statusFilter',''); $set('actionFilter',''); $set('dateFilter','')">Reset</button>@endif
+                    </div>
+                    @include('partials.commands')
+                    {{ $commands->links('partials.pagination') }}
+                </section>
+            @elseif($section === 'analytics')
+                <div class="stats">
+                    @foreach(['total' => 'Perintah', 'completed' => 'Selesai', 'unconfirmed' => 'Belum terkonfirmasi', 'motion' => 'Gerakan terdeteksi'] as $key => $label)
+                        <div class="stat"><strong>{{ $stats[$key] }}</strong>{{ $label }}</div>
+                    @endforeach
+                </div>
+                <section class="panel">
+                    <div class="panel-head"><h2>Isi wadah</h2>@include('partials.range')</div>
+                    @include('partials.chart')
+                </section>
+            @else
+                <div class="settings">
+                    <section class="panel">
+                        <h2 class="panel-head">Station</h2>
+                        <form wire:submit="saveStation" class="form">
+                            <label for="station-name">Nama</label>
+                            <input id="station-name" wire:model="stationName" maxlength="80" required>
+                            @error('stationName')<p class="form-error">{{ $message }}</p>@enderror
+                            <label for="station-location">Lokasi</label>
+                            <input id="station-location" wire:model="stationLocation" maxlength="80" required>
+                            @error('stationLocation')<p class="form-error">{{ $message }}</p>@enderror
+                            <div class="facts"><span class="pill">{{ $station->device_id }}</span><span class="pill">{{ $station->simulated ? 'Simulator' : 'Perangkat fisik' }}</span></div>
+                            <button class="button" type="submit" wire:loading.attr="disabled">Simpan</button>
+                        </form>
+                    </section>
+                    @if($station->simulated && app()->environment('local'))
+                        <section class="panel">
+                            <h2 class="panel-head">Skenario simulator</h2>
+                            <form wire:submit="applyScenario" class="form">
+                                <label for="scenario">Kondisi</label>
+                                <select id="scenario" wire:model="scenario"><option value="normal">Normal</option><option value="low_water">Air rendah</option><option value="invalid_sensor">Sensor tidak valid</option><option value="offline">Offline</option><option value="delayed">Hasil terlambat</option><option value="no_result">Hasil tidak diterima</option><option value="duplicate">Pesan duplikat</option></select>
+                                <button class="button soft" wire:loading.attr="disabled" @disabled(!$serviceOnline)>Terapkan</button>
+                            </form>
+                        </section>
+                    @endif
+                </div>
+            @endif
+        @endif
+    </main>
+
     @if($confirmation)
-    <div class="modal-overlay" x-data x-init="$nextTick(() => $refs.cancel.focus())" @keydown.escape.window="$wire.cancel()" wire:key="confirm-modal"><section class="modal" role="dialog" aria-modal="true" aria-labelledby="confirm-title" x-trap.inert.noscroll="true"><span class="modal-icon"><x-icon :name="$confirmation === 'feed' ? 'food' : 'water'"/></span><h2 id="confirm-title">{{ $confirmation === 'feed' ? 'Beri pakan sekarang?' : 'Salurkan air sekarang?' }}</h2><p>Perintah akan dikirim ke <strong>{{ $station->name }}</strong> untuk satu siklus terbatas selama 2 detik.</p><p class="small muted">Hasil ditampilkan setelah perangkat memberikan laporan.</p>@error('command')<p class="form-error" role="alert">{{ $message }}</p>@enderror<div class="modal-actions"><button class="button secondary" wire:click="cancel" x-ref="cancel">Batal</button><button class="button primary" wire:click="send" wire:loading.attr="disabled"><span wire:loading.remove wire:target="send">Ya, kirim perintah</span><span wire:loading wire:target="send">Mengirim...</span></button></div></section></div>
+        <div class="modal-overlay" x-data x-init="$nextTick(() => $refs.cancel.focus())" @keydown.escape.window="$wire.cancel()" wire:key="confirm-modal">
+            <section class="modal" role="dialog" aria-modal="true" aria-labelledby="confirm-title" x-trap.inert.noscroll="true">
+                <span class="chip {{ $confirmation === 'feed' ? 'food' : 'water' }}"><x-icon :name="$confirmation === 'feed' ? 'food' : 'water'"/></span>
+                <h2 id="confirm-title">{{ $confirmation === 'feed' ? 'Beri pakan sekarang?' : 'Salurkan air sekarang?' }}</h2>
+                <p class="muted">{{ $station->name }}</p>
+                @error('command')<p class="form-error" role="alert">{{ $message }}</p>@enderror
+                <div class="modal-actions">
+                    <button class="button soft" wire:click="cancel" x-ref="cancel">Batal</button>
+                    <button class="button" wire:click="send" wire:loading.attr="disabled"><span wire:loading.remove wire:target="send">{{ $confirmation === 'feed' ? 'Beri pakan' : 'Salurkan air' }}</span><span wire:loading wire:target="send">Mengirim…</span></button>
+                </div>
+            </section>
+        </div>
     @endif
+
     @if($detail)
-    <div class="modal-overlay" x-data x-init="$nextTick(() => $refs.close.focus())" @keydown.escape.window="$wire.cancel()" wire:key="detail-modal"><section class="modal detail-modal" role="dialog" aria-modal="true" aria-labelledby="detail-title" x-trap.inert.noscroll="true"><div class="panel-heading"><h2 id="detail-title">Detail perintah</h2><button class="icon-button" wire:click="cancel" x-ref="close" aria-label="Tutup detail"><x-icon name="close"/></button></div><div class="detail-id">{{ $detail->id }}</div><dl class="details"><div><dt>Tindakan</dt><dd>{{ $detail->actionLabel() }}</dd></div><div><dt>Status</dt><dd><span class="badge status-{{ $detail->status }}">{{ $detail->label() }}</span></dd></div><div><dt>Dibuat</dt><dd>{{ $detail->created_at->timezone('Asia/Jakarta')->format('d/m/Y H:i:s') }} WIB</dd></div><div><dt>Durasi dilaporkan</dt><dd>{{ isset($detail->result['duration_ms']) ? $detail->result['duration_ms'].' ms' : 'Belum tersedia' }}</dd></div>@if($detail->timed_out_at)<div><dt>Timeout tercatat</dt><dd>{{ $detail->timed_out_at->timezone('Asia/Jakarta')->format('H:i:s') }} WIB</dd></div>@endif @if($detail->reason)<div><dt>Keterangan</dt><dd>{{ $detail->reason }}</dd></div>@endif @foreach(['before'=>'Sebelum','after'=>'Sesudah'] as $key=>$label)@if(isset($detail->result[$key]))<div><dt>{{ $label }}</dt><dd>{{ $detail->result[$key]['food_g'] ?? 'N/A' }} g pakan · {{ $detail->result[$key]['water_pct'] ?? 'N/A' }}% level air</dd></div>@endif @endforeach</dl><p class="small muted">Selesai menunjukkan siklus keluaran perangkat. Penyaluran fisik belum diverifikasi.</p></section></div>
+        <div class="modal-overlay" x-data x-init="$nextTick(() => $refs.close.focus())" @keydown.escape.window="$wire.cancel()" wire:key="detail-modal">
+            <section class="modal" role="dialog" aria-modal="true" aria-labelledby="detail-title" x-trap.inert.noscroll="true">
+                <div class="panel-head"><h2 id="detail-title">{{ $detail->actionLabel() }}</h2><button class="icon-button" wire:click="cancel" x-ref="close" aria-label="Tutup"><x-icon name="close"/></button></div>
+                <span class="pill status-{{ $detail->status }}">{{ $detail->label() }}</span>
+                <dl class="details">
+                    <div><dt>Waktu</dt><dd>{{ $detail->created_at->timezone('Asia/Jakarta')->format('d/m/Y H:i:s') }}</dd></div>
+                    @if(isset($detail->result['duration_ms']))<div><dt>Durasi</dt><dd>{{ $detail->result['duration_ms'] }} ms</dd></div>@endif
+                    @foreach(['before' => 'Sebelum', 'after' => 'Sesudah'] as $key => $label)
+                        @if(isset($detail->result[$key]))<div><dt>{{ $label }}</dt><dd>{{ $detail->result[$key]['food_g'] ?? '–' }} g · {{ $detail->result[$key]['water_pct'] ?? '–' }}%</dd></div>@endif
+                    @endforeach
+                    @if($detail->reason)<div><dt>Catatan</dt><dd>{{ $detail->reason }}</dd></div>@endif
+                </dl>
+            </section>
+        </div>
     @endif
 </div>

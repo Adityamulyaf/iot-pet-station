@@ -11,18 +11,18 @@ document.addEventListener('alpine:init', () => {
                     data: {
                         labels: initial.labels,
                         datasets: [
-                            { label: 'Pakan (g)', data: initial.food, yAxisID: 'food', borderColor: '#bd9255', backgroundColor: '#bd925510', fill: true, pointRadius: initial.labels.length === 1 ? 4 : 0, pointHoverRadius: 4, borderWidth: 2, tension: .3, spanGaps: false },
-                            { label: 'Air (% level)', data: initial.water, yAxisID: 'water', borderColor: '#397b64', backgroundColor: '#397b640c', fill: true, pointRadius: initial.labels.length === 1 ? 4 : 0, pointHoverRadius: 4, borderWidth: 2, tension: .3, spanGaps: false }
+                            { label: 'Pakan (g)', data: initial.food, yAxisID: 'food', borderColor: '#e0a526', backgroundColor: '#e0a52618', fill: true, pointRadius: initial.labels.length === 1 ? 4 : 0, pointHoverRadius: 4, borderWidth: 3, tension: .3, spanGaps: false },
+                            { label: 'Air (% level)', data: initial.water, yAxisID: 'water', borderColor: '#4a9cc0', backgroundColor: '#4a9cc018', fill: true, pointRadius: initial.labels.length === 1 ? 4 : 0, pointHoverRadius: 4, borderWidth: 3, tension: .3, spanGaps: false }
                         ]
                     },
                     options: {
                         responsive: true, maintainAspectRatio: false, animation: false,
                         interaction: { mode: 'index', intersect: false },
-                        plugins: { legend: { display: false }, tooltip: { backgroundColor: '#253b32', padding: 12, cornerRadius: 8, displayColors: true } },
+                        plugins: { legend: { display: false }, tooltip: { backgroundColor: '#4a2c18', padding: 12, cornerRadius: 8, displayColors: true } },
                         scales: {
-                            x: { grid: { display: false }, ticks: { color: '#8b9690', maxTicksLimit: 6, maxRotation: 0, font: { size: 11 } }, border: { display: false } },
-                            food: { position: 'left', beginAtZero: true, suggestedMax: 1000, ticks: { color: '#8b9690', maxTicksLimit: 5, font: { size: 11 } }, grid: { color: '#eef1ee', drawTicks: false }, border: { display: false } },
-                            water: { position: 'right', min: 0, max: 100, ticks: { color: '#8b9690', stepSize: 25, callback: value => value + '%', font: { size: 11 } }, grid: { drawOnChartArea: false, drawTicks: false }, border: { display: false } }
+                            x: { grid: { display: false }, ticks: { color: '#8a6a4f', maxTicksLimit: 6, maxRotation: 0, font: { size: 11 } }, border: { display: false } },
+                            food: { position: 'left', beginAtZero: true, suggestedMax: 1000, ticks: { color: '#8a6a4f', maxTicksLimit: 5, font: { size: 11 } }, grid: { color: '#f3e6c2', drawTicks: false }, border: { display: false } },
+                            water: { position: 'right', min: 0, max: 100, ticks: { color: '#8a6a4f', stepSize: 25, callback: value => value + '%', font: { size: 11 } }, grid: { drawOnChartArea: false, drawTicks: false }, border: { display: false } }
                         }
                     }
                 });
