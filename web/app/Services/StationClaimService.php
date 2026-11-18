@@ -70,12 +70,13 @@ class StationClaimService
     }
 
     /**
-     * Remove the owner and wipe history so the next owner starts clean. A new code must be issued by the admin.
+     * Remove the owner, shared members, and history so the next owner starts clean. A new code must be issued by the admin.
      */
     public function release(Station $station): void
     {
         DB::transaction(function () use ($station): void {
             $station->commands()->delete();
+            $station->members()->detach();
             $station->messages()->delete();
             $station->forceFill(['user_id' => null, 'claim_code_hash' => null, 'claimed_at' => null])->save();
         });

@@ -36,6 +36,7 @@
                     @endphp
                     <a class="station-card" href="{{ route('station',[$item,'dashboard']) }}">
                         <div class="station-card-top"><h2>{{ $item->name }}</h2><span class="pill {{ $item->online() ? 'on' : 'off' }}">{{ $item->online() ? 'Online' : 'Offline' }}</span></div>
+                        @if($item->user_id !== auth()->id())<span class="pill shared">Dibagikan</span>@endif
                         <div class="station-card-values"><div>Pakan<strong>{{ $itemFood }}</strong></div><div>Air<strong>{{ $itemWater }}</strong></div></div>
                     </a>
                 @endforeach
@@ -72,12 +73,15 @@
                     !$foodValid || !$waterValid => 'Sensor tidak terbaca.',
                     default => '',
                 };
+                $canOperate = in_array($role, [\App\Models\Station::ROLE_OWNER, \App\Models\Station::ROLE_OPERATOR], true);
+                $isOwner = $role === \App\Models\Station::ROLE_OWNER;
                 $bowlNote = fn (bool $valid, float $value, float $full) => !$valid ? 'Tidak terbaca' : ($value >= $full ? 'Penuh' : ($value < 20 ? 'Hampir kosong' : ''));
             @endphp
 
             <div class="status-row">
                 <span class="pill {{ $station->online() ? 'on' : 'off' }}">{{ $station->online() ? 'Online' : 'Offline' }}</span>
                 @if($station->simulated)<span class="pill">Simulasi</span>@endif
+                @unless($isOwner)<span class="pill shared">{{ \App\Models\Station::SHARED_ROLES[$role] }}</span>@endunless
                 @if($fresh && ($data['pir'] ?? false))<span class="pill warn">Ada gerakan</span>@endif
                 <span class="time">@if($station->telemetry_at){{ $fresh ? '' : 'Terlambat · ' }}{{ $station->telemetry_at->timezone('Asia/Jakarta')->format('H:i:s') }}@else Belum ada data @endif</span>
             </div>
@@ -89,17 +93,17 @@
                         <div class="tile-value">{{ isset($data['food_g']) ? number_format($food,0,',','.') : '–' }}<small>g</small></div>
                         <div class="bar"><span style="width:{{ min(100,max(0,$food/$foodFull*100)) }}%"></span></div>
                         <div class="tile-note">{{ $bowlNote($foodValid, $food, $foodFull) }}</div>
-                        <button class="button wide" wire:click="ask('feed')" @disabled(!$ready || $food >= $foodFull)>Beri pakan</button>
+                        @if($canOperate)<button class="button wide" wire:click="ask('feed')" @disabled(!$ready || $food >= $foodFull)>Beri pakan</button>@endif
                     </section>
                     <section class="tile water">
                         <div class="tile-head"><x-icon name="water"/>Air</div>
                         <div class="tile-value">{{ isset($data['water_pct']) ? round($water) : '–' }}<small>%</small></div>
                         <div class="bar"><span style="width:{{ min(100,max(0,$water)) }}%"></span></div>
                         <div class="tile-note">{{ $bowlNote($waterValid, $water, $waterFull) }}</div>
-                        <button class="button wide" wire:click="ask('water')" @disabled(!$ready || $water >= $waterFull)>Salurkan air</button>
+                        @if($canOperate)<button class="button wide" wire:click="ask('water')" @disabled(!$ready || $water >= $waterFull)>Salurkan air</button>@endif
                     </section>
                 </div>
-                @if($hint)<p class="hint">{{ $hint }}</p>@endif
+                @if($canOperate && $hint)<p class="hint">{{ $hint }}</p>@endif
 
                 <section class="panel">
                     <div class="panel-head"><h2>Aktivitas</h2><a href="{{ route('station',[$station,'history']) }}">Semua</a></div>
@@ -126,6 +130,15 @@
                     <div class="panel-head"><h2>Isi wadah</h2>@include('partials.range')</div>
                     @include('partials.chart')
                 </section>
+            @elseif(!$isOwner)
+                <div class="settings">
+                    <section class="panel">
+                        <h2 class="panel-head">Akses kamu</h2>
+                        <div class="facts"><span class="pill shared">{{ \App\Models\Station::SHARED_ROLES[$role] }}</span><span class="pill">Dari {{ $station->user?->name }}</span></div>
+                        <p class="muted small">{{ $role === \App\Models\Station::ROLE_OPERATOR ? 'Kamu bisa memantau dan memberi pakan atau air.' : 'Kamu bisa memantau, tapi tidak mengirim perintah.' }}</p>
+                        <button class="button danger" wire:click="leave" wire:confirm="Keluar dari {{ $station->name }}?">Keluar dari station</button>
+                    </section>
+                </div>
             @else
                 <div class="settings">
                     <section class="panel">
@@ -140,6 +153,27 @@
                             <div class="facts"><span class="pill">{{ $station->device_id }}</span><span class="pill">{{ $station->simulated ? 'Simulator' : 'Perangkat fisik' }}</span></div>
                             <button class="button" type="submit" wire:loading.attr="disabled">Simpan</button>
                         </form>
+                    </section>
+                    <section class="panel">
+                        <h2 class="panel-head">Bagikan</h2>
+                        <form wire:submit="share" class="form">
+                            <label for="share-email">Email akun</label>
+                            <input id="share-email" type="email" wire:model="shareEmail" autocomplete="off" placeholder="nama@email.com">
+                            <div class="segmented" role="radiogroup" aria-label="Peran">
+                                @foreach(\App\Models\Station::SHARED_ROLES as $value => $label)
+                                    <label><input type="radio" wire:model="shareRole" value="{{ $value }}"><span>{{ $label }}</span></label>
+                                @endforeach
+                            </div>
+                            @if($errors->hasAny(['shareEmail', 'shareRole']))<p class="form-error" role="alert">{{ $errors->first('shareEmail') ?: $errors->first('shareRole') }}</p>@endif
+                            <button class="button" type="submit" wire:loading.attr="disabled">Bagikan</button>
+                        </form>
+                        @if($members->isNotEmpty())
+                            <ul class="members">
+                                @foreach($members as $member)
+                                    <li wire:key="member-{{ $member->id }}"><span class="list-main">{{ $member->name }}<small>{{ $member->email }}</small></span><span class="pill shared">{{ \App\Models\Station::SHARED_ROLES[$member->pivot->role] ?? $member->pivot->role }}</span><button class="icon-button" wire:click="revoke({{ $member->id }})" wire:confirm="Cabut akses {{ $member->name }}?" aria-label="Cabut akses {{ $member->name }}"><x-icon name="close"/></button></li>
+                                @endforeach
+                            </ul>
+                        @endif
                     </section>
                     <section class="panel">
                         <h2 class="panel-head">Lepas station</h2>
@@ -195,6 +229,7 @@
                 <div class="panel-head"><h2 id="detail-title">{{ $detail->actionLabel() }}</h2><button class="icon-button" wire:click="cancel" x-ref="close" aria-label="Tutup"><x-icon name="close"/></button></div>
                 <span class="pill status-{{ $detail->status }}">{{ $detail->label() }}</span>
                 <dl class="details">
+                    @if($detail->user)<div><dt>Oleh</dt><dd>{{ $detail->user->name }}</dd></div>@endif
                     <div><dt>Waktu</dt><dd>{{ $detail->created_at->timezone('Asia/Jakarta')->format('d/m/Y H:i:s') }}</dd></div>
                     @if(isset($detail->result['duration_ms']))<div><dt>Durasi</dt><dd>{{ $detail->result['duration_ms'] }} ms</dd></div>@endif
                     @foreach(['before' => 'Sebelum', 'after' => 'Sesudah'] as $key => $label)

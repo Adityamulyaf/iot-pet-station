@@ -56,6 +56,8 @@ Versi paket ditentukan dan dikunci saat setup setelah kompatibilitas lingkungan 
 
 Penambahan station memakai pola kode klaim. Admin mendaftarkan perangkat di server (`deploy/station-create.sh`), yang membuat kredensial broker, ACL, dan kode klaim sekali pakai. Pengguna mendaftar akun sendiri di halaman **Daftar**, lalu memasukkan ID perangkat dan kode klaim di **Tambah station**. Kode disimpan sebagai hash, hangus setelah dipakai, dan percobaan klaim dibatasi lima kali per 10 menit; ID salah dan kode salah menghasilkan pesan yang sama. Pemilik dapat melepas station dari Pengaturan, yang menghapus riwayatnya; klaim berikutnya membutuhkan kode baru (`station:code`). Kredensial broker tidak pernah ditampilkan ke browser.
 
+Pemilik dapat membagikan station ke akun lain yang sudah terdaftar melalui **Pengaturan > Bagikan** dengan peran **Pemantau** (melihat dashboard, riwayat, dan grafik) atau **Operator** (juga mengirim perintah pakan dan air). Mengganti nama, berbagi akses, skenario simulator, dan melepas station hanya untuk pemilik. Hak akses diperiksa pada setiap permintaan melalui policy, sehingga pencabutan langsung berlaku. Riwayat perintah mencatat akun pengirim.
+
 ### 5.1 Monitoring
 
 - Berat pakan ditampilkan dalam gram berdasarkan load cell di bawah wadah pakan.
@@ -219,7 +221,6 @@ Simulator menguji perilaku software; hasilnya tidak membuktikan akurasi sensor a
 ## 15. Pengembangan berikutnya
 
 - Integrasi firmware ESP32 dan kalibrasi sensor serta aktuator fisik.
-- Akses bersama station untuk akun lain (viewer/operator).
 - Penetapan retensi data dan optimasi berdasarkan pengukuran jumlah station.
 - Konfigurasi deployment, HTTPS, MQTT/TLS, sertifikat, serta pengawasan proses server.
 - Penjadwalan dan fitur tambahan tetap mengikuti prioritas pengembangan berikutnya.

@@ -16,6 +16,11 @@ class StationCommand extends Model
 
     protected $dateFormat = 'Y-m-d H:i:s.u';
 
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
+    }
+
     public function station(): BelongsTo
     {
         return $this->belongsTo(Station::class);

@@ -7,13 +7,14 @@ use App\Models\StationCommand;
 use App\Models\User;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
 
 class CommandService
 {
     public function create(User $user, Station $station, string $action, array $parameters = []): StationCommand
     {
-        abort_unless($station->user_id === $user->id, 403);
+        abort_unless(Gate::forUser($user)->allows($action === 'scenario' ? 'manage' : 'operate', $station), 403);
 
         return DB::transaction(function () use ($user, $station, $action, $parameters): StationCommand {
             $station = Station::query()->lockForUpdate()->findOrFail($station->id);

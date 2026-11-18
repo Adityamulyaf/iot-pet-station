@@ -70,17 +70,18 @@ Pekerjaan:
 
 ## 4. Akses bersama (untuk dosen atau anggota keluarga)
 
-Masalah: satu station hanya punya satu pemilik, sehingga akun lain melihat dashboard kosong.
+Status: selesai (19 November 2026). Peran ditampilkan sebagai **Pemantau** (`viewer`) dan **Operator** (`operator`). Anggota bisa keluar sendiri dari Pengaturan; melepas station juga menghapus semua anggota.
+
+Masalah awal: satu station hanya punya satu pemilik, sehingga akun lain melihat dashboard kosong.
 
 Rencana:
 
-- [ ] Tabel `station_user` (station, user, peran `viewer` atau `operator`).
-- [ ] `viewer`: melihat dashboard, riwayat, analytics. `operator`: juga bisa Beri Pakan/Salurkan Air. Pengaturan station dan berbagi akses hanya untuk pemilik.
-- [ ] Policy Laravel menggantikan pengecekan `user_id` langsung di `StationApp` dan `CommandService`.
-- [ ] Menu **Bagikan** di Pengaturan station: undang lewat email akun yang sudah terdaftar, pilih peran, cabut akses.
-- [ ] Tes: viewer tidak bisa mengirim perintah, akses dicabut langsung berlaku, pengguna tanpa akses tetap ditolak.
+- [x] Tabel `station_user` (station, user, peran `viewer` atau `operator`).
+- [x] `viewer`: melihat dashboard, riwayat, analytics. `operator`: juga bisa Beri Pakan/Salurkan Air. Pengaturan station dan berbagi akses hanya untuk pemilik.
+- [x] Policy Laravel menggantikan pengecekan `user_id` langsung di `StationApp` dan `CommandService`.
+- [x] Menu **Bagikan** di Pengaturan station: undang lewat email akun yang sudah terdaftar, pilih peran, cabut akses.
+- [x] Tes: viewer tidak bisa mengirim perintah, akses dicabut langsung berlaku, pengguna tanpa akses tetap ditolak.
 
-Alternatif sementara sebelum fitur ini ada: dosen login memakai akun pemilik.
 
 ## 5. Pemeliharaan dan catatan
 

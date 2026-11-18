@@ -58,6 +58,8 @@ label { display: block; font-weight: 700; font-size: 14px; margin-bottom: 6px; }
 .pill.on, .status-completed { background: var(--sage); }
 .pill.off, .status-failed { background: var(--blush); }
 .pill.warn, .status-rejected, .status-timeout { background: var(--butter-soft); }
+.pill.shared { background: var(--sky-soft); }
+.station-card .pill.shared { align-self: flex-start; margin-top: -6px; }
 .status-pending, .status-running { background: var(--sky-soft); }
 
 /* Kerangka */
@@ -148,6 +150,14 @@ label { display: block; font-weight: 700; font-size: 14px; margin-bottom: 6px; }
 .form .button { align-self: flex-start; margin-top: 6px; }
 .form-error { color: #a33a2a; font-size: 13px; font-weight: 700; margin: -6px 0 8px; }
 .facts { display: flex; flex-wrap: wrap; gap: 8px; margin: 4px 0 10px; }
+.segmented { display: flex; gap: 6px; margin: 2px 0 10px; }
+.segmented label { margin: 0; flex: 1; }
+.segmented input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.segmented span { display: block; text-align: center; padding: 9px 12px; border-radius: 999px; background: var(--cream); font-weight: 700; cursor: pointer; }
+.segmented input:checked + span { background: var(--cocoa); color: var(--paper); }
+.segmented input:focus-visible + span { outline: 3px solid var(--cocoa); outline-offset: 2px; }
+.members { list-style: none; margin: 16px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.members li { display: flex; align-items: center; gap: 10px; padding: 8px 4px 8px 12px; border-radius: 14px; background: var(--cream); }
 .settings { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; align-items: start; }
 .pager { display: flex; align-items: center; justify-content: center; gap: 14px; margin-top: 14px; font-weight: 800; }
 
