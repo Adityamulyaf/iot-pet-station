@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#f6f8f7">
-    <meta name="description" content="Pantau persediaan dan kendalikan pet station Anda.">
+    <meta name="description" content="Pantau isi wadah dan kendalikan pet station Anda.">
     <title>{{ $title ?? 'Dashboard' }} | Petstation</title>
     <link rel="icon" href="{{ asset('favicon.svg') }}" type="image/svg+xml">
     @vite(['resources/css/app.css', 'resources/js/app.js'])

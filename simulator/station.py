@@ -20,12 +20,15 @@ def utc():
 
 class Station:
     SCENARIOS = {"normal", "low_water", "invalid_sensor", "offline", "delayed", "no_result", "duplicate"}
+    # Sensor berada di wadah: perintah menambah isi wadah, hewan perlahan menguranginya.
+    FOOD_FULL_G, WATER_FULL_PCT = 200.0, 90.0
+    FEED_STEP_G, WATER_STEP_PCT = 25.0, 15.0
 
     def __init__(self, device, username, password, host="127.0.0.1", port=1883, state_dir=None):
         self.device = device
         self.path = Path(state_dir or Path(__file__).parent.parent / ".runtime" / "simulator") / f"{device}.json"
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        self.data = {"food_g": 840.0, "water_pct": 78.0, "scenario": "normal", "processed": {}, "pending": {}, "cooldown_until": 0}
+        self.data = {"food_g": 40.0, "water_pct": 35.0, "scenario": "normal", "processed": {}, "pending": {}, "cooldown_until": 0}
         if self.path.exists():
             self.data.update(json.loads(self.path.read_text()))
         self.lock = threading.RLock()
@@ -143,8 +146,8 @@ class Station:
                     self.result(command_id, "rejected", "Skenario tidak dikenal.")
                     return
                 self.data["scenario"] = scenario
-                self.data["water_pct"] = 8.0 if scenario == "low_water" else 78.0
-                self.data["food_g"] = 840.0
+                self.data["water_pct"] = 8.0 if scenario == "low_water" else 35.0
+                self.data["food_g"] = 40.0
                 self.data["cooldown_until"] = 0
                 self.result(command_id, "completed", "Skenario diperbarui.")
                 self.state()
@@ -163,8 +166,8 @@ class Station:
             if self.data["scenario"] == "invalid_sensor":
                 self.result(command_id, "rejected", "Pembacaan sensor tidak valid.")
                 return
-            if (action == "water" and self.data["water_pct"] < 20) or (action == "feed" and self.data["food_g"] < 30):
-                self.result(command_id, "rejected", "Persediaan reservoir rendah.")
+            if (action == "water" and self.data["water_pct"] >= self.WATER_FULL_PCT) or (action == "feed" and self.data["food_g"] >= self.FOOD_FULL_G):
+                self.result(command_id, "rejected", "Wadah sudah penuh.")
                 return
             if time.time() < self.data["cooldown_until"]:
                 self.result(command_id, "rejected", "Cooldown belum selesai.")
@@ -182,9 +185,9 @@ class Station:
             time.sleep(duration / 1000)
             with self.lock:
                 if action == "feed":
-                    self.data["food_g"] = max(0, self.data["food_g"] - 25)
+                    self.data["food_g"] += self.FEED_STEP_G
                 else:
-                    self.data["water_pct"] = max(0, self.data["water_pct"] - 4)
+                    self.data["water_pct"] = min(100.0, self.data["water_pct"] + self.WATER_STEP_PCT)
                 self.data["cooldown_until"] = time.time() + 10
         finally:
             self.busy, self.active_command = False, None
@@ -211,6 +214,11 @@ class Station:
         try:
             while self.running:
                 if self.client.is_connected() and self.data["scenario"] != "offline":
+                    with self.lock:
+                        if not self.busy:
+                            # Hewan makan dan minum perlahan dari wadah.
+                            self.data["food_g"] = max(0.0, self.data["food_g"] - 0.4)
+                            self.data["water_pct"] = max(0.0, self.data["water_pct"] - 0.2)
                     self.telemetry()
                     if time.time() - last_retry >= 10:
                         with self.lock:

@@ -61,8 +61,8 @@ class MessageIngestor
                             $command->status = $payload['status'];
                             $command->reason = $payload['reason'] ?? null;
                             $command->resolved_at = now();
-                            if ($command->action === 'feed' && $payload['status'] === 'completed' && ($payload['before']['food_valid'] ?? false) && ($payload['after']['food_valid'] ?? false) && isset($payload['before']['food_g'], $payload['after']['food_g']) && $payload['before']['food_g'] - $payload['after']['food_g'] < 0.5) {
-                                $command->reason = 'Siklus selesai, perubahan berat belum terdeteksi. Periksa penyaluran.';
+                            if ($payload['status'] === 'completed' && in_array($command->action, ['feed', 'water'], true)) {
+                                $command->reason = $this->bowlIncreaseNote($command->action, $payload['before'] ?? [], $payload['after'] ?? []) ?? $command->reason;
                             }
                             if ($command->action === 'scenario' && $payload['status'] === 'completed') {
                                 $station->scenario = $command->parameters['scenario'];
@@ -78,5 +78,23 @@ class MessageIngestor
 
             return ['schema_version' => 1, 'device_id' => $station->device_id, 'message_id' => $message->message_id, 'stored_at' => now()->toIso8601String()];
         });
+    }
+
+    /**
+     * Sensor berada di wadah, jadi penyaluran dikonfirmasi oleh kenaikan isi wadah.
+     *
+     * @param  array<string, mixed>  $before
+     * @param  array<string, mixed>  $after
+     */
+    private function bowlIncreaseNote(string $action, array $before, array $after): ?string
+    {
+        [$field, $valid, $minimum, $note] = $action === 'feed'
+            ? ['food_g', 'food_valid', config('station.min_food_increase_g'), 'Siklus selesai, berat pakan di wadah tidak bertambah. Periksa penyaluran atau stok pakan.']
+            : ['water_pct', 'water_valid', config('station.min_water_increase_pct'), 'Siklus selesai, level air di wadah tidak naik. Periksa pompa atau stok air.'];
+        if (! ($before[$valid] ?? false) || ! ($after[$valid] ?? false) || ! isset($before[$field], $after[$field])) {
+            return null;
+        }
+
+        return $minimum > $after[$field] - $before[$field] ? $note : null;
     }
 }

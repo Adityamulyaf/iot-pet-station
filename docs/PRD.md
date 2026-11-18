@@ -10,7 +10,7 @@
 
 ## 2. Latar belakang dan tujuan
 
-Pemilik hewan membutuhkan sarana untuk memantau persediaan pakan dan air serta mengendalikan penyalurannya dari jarak jauh. Proyek ini membangun web dan backend mandiri untuk menerima pembacaan sensor, mengirim perintah, menyimpan riwayat, dan menyajikan analytics.
+Pemilik hewan membutuhkan sarana untuk memantau sisa pakan dan air di wadah yang dapat dikonsumsi hewan serta mengendalikan penyalurannya dari jarak jauh. Proyek ini membangun web dan backend mandiri untuk menerima pembacaan sensor, mengirim perintah, menyimpan riwayat, dan menyajikan analytics.
 
 Pengembangan dimulai menggunakan simulator di lingkungan lokal. Simulator mengikuti kontrak pesan perangkat sehingga ESP32 dapat diintegrasikan kemudian tanpa mengubah alur utama web dan backend. Prototipe fisik ditargetkan satu unit, sedangkan struktur aplikasi mendukung beberapa station dengan identitas dan kepemilikan terpisah.
 
@@ -22,7 +22,7 @@ Alur utama:
 
 1. Pengguna login.
 2. Pengguna memilih station miliknya.
-3. Pengguna melihat persediaan reservoir, kondisi perangkat, dan waktu pembacaan.
+3. Pengguna melihat sisa pakan dan air di wadah, kondisi perangkat, dan waktu pembacaan.
 4. Pengguna memilih Beri Pakan atau Salurkan Air lalu mengonfirmasi tindakan.
 5. Aplikasi menampilkan perkembangan dan hasil perintah.
 6. Pengguna meninjau riwayat dan analytics station tersebut.
@@ -51,14 +51,14 @@ Versi paket ditentukan dan dikunci saat setup setelah kompatibilitas lingkungan 
 | Dashboard station  | Berat pakan, level air, gerakan PIR, state servo/pompa, kualitas dan waktu pembacaan   |
 | Kontrol            | Beri Pakan, Salurkan Air, konfirmasi, status proses, dan alasan penolakan/kegagalan    |
 | Riwayat            | Daftar perintah dan detail hasil; filter tanggal, jenis, dan status                    |
-| Analytics          | Grafik persediaan pakan dan level air, jumlah perintah menurut hasil, dan kejadian PIR |
+| Analytics          | Grafik isi wadah pakan dan level air, jumlah perintah menurut hasil, dan kejadian PIR |
 | Pengaturan station | Nama station serta informasi identitas dan konfigurasi yang relevan                    |
 
 Penambahan station dilakukan melalui mekanisme registrasi/provisioning yang menghubungkan identitas perangkat dengan akun. Bentuk antarmuka provisioning ditentukan saat perancangan detail; kredensial broker tidak ditampilkan ke browser.
 
 ### 5.1 Monitoring
 
-- Berat pakan ditampilkan dalam gram berdasarkan reservoir.
+- Berat pakan ditampilkan dalam gram berdasarkan load cell di bawah wadah pakan.
 - Air ditampilkan sebagai level terkalibrasi, berupa persentase dan/atau kategori rendah, sedang, atau penuh.
 - Persentase level air tidak dinyatakan sebagai persentase volume tanpa kalibrasi yang mendukung.
 - PIR menampilkan gerakan terdeteksi atau tidak terdeteksi.
@@ -81,11 +81,10 @@ Penambahan station dilakukan melalui mekanisme registrasi/provisioning yang meng
 
 ### 5.3 Batas interpretasi data
 
-- Pembacaan reservoir menunjukkan persediaan, bukan konsumsi hewan.
+- Sensor berada di wadah, sehingga pembacaan menunjukkan sisa pakan dan air yang dapat dikonsumsi hewan, bukan persediaan di penampung.
 - PIR tidak membuktikan hewan sedang makan atau minum.
 - State selesai menunjukkan siklus eksekusi yang dilaporkan perangkat selesai, bukan bukti penyaluran fisik.
-- Penurunan berat reservoir menjadi indikasi pakan tersalurkan. Tidak adanya perubahan pada pembacaan valid diberi penanda perlu pemeriksaan.
-- Tidak adanya perubahan level air tidak otomatis dianggap kegagalan karena keterbatasan resolusi sensor.
+- Kenaikan isi wadah setelah siklus menjadi konfirmasi pakan/air tersalurkan. Penurunan di luar siklus menunjukkan hewan makan atau minum. Siklus selesai tanpa kenaikan pada pembacaan valid diberi penanda perlu pemeriksaan (penyaluran macet atau stok penampung habis).
 - Data simulator ditandai jelas pada tampilan dan tidak dijadikan bukti pengujian fisik.
 
 ## 6. Arsitektur dan kontrak komunikasi
@@ -143,8 +142,8 @@ Simulator harus mampu:
 
 1. Mengirim telemetry berkala dengan identitas station unik.
 2. Menerima perintah dan mengirim perkembangan serta hasil eksekusi.
-3. Meniru perubahan reservoir setelah eksekusi.
-4. Menolak perintah saat reservoir rendah, sensor invalid, cooldown aktif, atau eksekusi lain berlangsung.
+3. Meniru kenaikan isi wadah setelah eksekusi dan penurunan perlahan saat hewan makan/minum.
+4. Menolak perintah saat wadah sudah penuh, sensor invalid, cooldown aktif, atau eksekusi lain berlangsung.
 5. Menerapkan batas durasi, masa berlaku, dan deduplikasi perintah.
 6. Meniru offline, reconnect, pesan duplikat, serta hasil terlambat/tidak diterima.
 7. Mengirim ulang pesan yang belum mendapat ACK aplikasi dalam batas antrean yang ditentukan.
@@ -191,7 +190,7 @@ Simulator menguji perilaku software; hasilnya tidak membuktikan akurasi sensor a
 - Pembaruan dashboard mengikuti polling 5 detik saat halaman aktif dan koneksi tersedia.
 - Perintah pakan/air menempuh alur web → backend → MQTT → simulator → hasil → riwayat.
 - Perintah tidak dinyatakan selesai hanya karena berhasil diterbitkan ke broker.
-- Kondisi offline, sensor invalid, reservoir rendah, cooldown, timeout, dan hasil terlambat ditampilkan dengan benar.
+- Kondisi offline, sensor invalid, wadah penuh, cooldown, timeout, dan hasil terlambat ditampilkan dengan benar.
 - Pesan duplikat tidak menggandakan data atau eksekusi.
 - Data dan perintah beberapa station tetap terpisah; akses lintas kepemilikan ditolak.
 - Riwayat dan grafik sesuai dengan data yang tersimpan.
@@ -205,7 +204,7 @@ Simulator menguji perilaku software; hasilnya tidak membuktikan akurasi sensor a
 - Web, broker, dan database berjalan lokal pada `127.0.0.1`, masing-masing port 8000, 1883, dan 3307. Data MariaDB terpisah dari database XAMPP/Laragon yang sudah ada.
 - Dashboard polling setiap 5 detik. Data terlambat setelah 15 detik; offline setelah 20 detik tanpa pembacaan/heartbeat baru.
 - Masa berlaku perintah 15 detik; timeout hasil 30 detik. Perintah yang kedaluwarsa sebelum dikirim ditandai gagal. Hasil terlambat direkonsiliasi tanpa menghapus catatan timeout.
-- Siklus pakan/air dari web dibatasi 2 detik; batas lokal simulator 3 detik; cooldown 10 detik. Ambang air rendah 20% level dan persediaan pakan minimum 30 gram merupakan parameter awal simulator, bukan hasil kalibrasi fisik.
+- Siklus pakan/air dari web dibatasi 2 detik; batas lokal simulator 3 detik; cooldown 10 detik. Batas wadah penuh 200 gram pakan dan 90% level air (`BOWL_FOOD_FULL_G`, `BOWL_WATER_FULL_PCT`) merupakan parameter awal, bukan hasil kalibrasi fisik.
 - Akun demo lokal dan dua station simulator dibuat saat setup. Penambahan kepemilikan station tersedia melalui CLI; provisioning kredensial perangkat tambahan masih terpisah.
 - Grafik menggunakan rata-rata pembacaan sensor valid dengan rentang 1 jam, 24 jam, atau 7 hari. Waktu ditampilkan dalam Asia/Jakarta.
 

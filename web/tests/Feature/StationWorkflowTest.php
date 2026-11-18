@@ -31,7 +31,7 @@ class StationWorkflowTest extends TestCase
         parent::setUp();
         $this->travelTo(now()->startOfSecond());
         $this->owner = User::factory()->create();
-        $this->station = Station::factory()->create(['user_id' => $this->owner->id, 'connected' => true, 'last_seen_at' => now(), 'telemetry_at' => now(), 'state_at' => now(), 'snapshot' => ['food_g' => 800, 'water_pct' => 80, 'food_valid' => true, 'water_valid' => true, 'pir' => false], 'actuators' => ['servo' => 'closed', 'pump' => 'off']]);
+        $this->station = Station::factory()->create(['user_id' => $this->owner->id, 'connected' => true, 'last_seen_at' => now(), 'telemetry_at' => now(), 'state_at' => now(), 'snapshot' => ['food_g' => 50, 'water_pct' => 40, 'food_valid' => true, 'water_valid' => true, 'pir' => false], 'actuators' => ['servo' => 'closed', 'pump' => 'off']]);
         Cache::put('mqtt-worker-online', true, 60);
     }
 
@@ -39,7 +39,7 @@ class StationWorkflowTest extends TestCase
     {
         $payload = ['schema_version' => 1, 'device_id' => $this->station->device_id, 'message_id' => (string) Str::uuid(), 'recorded_at' => now()->toIso8601String()];
         if ($kind === 'telemetry') {
-            $payload += ['food_g' => 780, 'water_pct' => 76, 'food_raw' => 100000, 'water_raw' => 3000, 'food_valid' => true, 'water_valid' => true, 'pir' => false, 'servo' => 'closed', 'pump' => 'off'];
+            $payload += ['food_g' => 60, 'water_pct' => 45, 'food_raw' => 100000, 'water_raw' => 3000, 'food_valid' => true, 'water_valid' => true, 'pir' => false, 'servo' => 'closed', 'pump' => 'off'];
         }
 
         return array_replace($payload, $fields);
@@ -89,7 +89,7 @@ class StationWorkflowTest extends TestCase
         $old = $this->message('telemetry', ['recorded_at' => now()->subMinutes(2)->toIso8601String(), 'food_g' => 950]);
         $this->ingest('telemetry', $old);
         $this->assertSame(2, DeviceMessage::query()->count());
-        $this->assertEquals(780, $this->station->fresh()->snapshot['food_g']);
+        $this->assertEquals(60, $this->station->fresh()->snapshot['food_g']);
     }
 
     public function test_offline_invalid_low_water_and_unavailable_worker_reject_commands(): void
@@ -98,7 +98,7 @@ class StationWorkflowTest extends TestCase
             ['connected' => false],
             ['connected' => true, 'telemetry_at' => now()->subMinute()],
             ['telemetry_at' => now(), 'snapshot' => ['food_g' => 800, 'water_pct' => 80, 'food_valid' => true, 'water_valid' => false]],
-            ['snapshot' => ['food_g' => 800, 'water_pct' => 8, 'food_valid' => true, 'water_valid' => true]],
+            ['snapshot' => ['food_g' => 50, 'water_pct' => 95, 'food_valid' => true, 'water_valid' => true]],
         ];
         foreach ($checks as $changes) {
             $this->station->update($changes);
@@ -130,7 +130,7 @@ class StationWorkflowTest extends TestCase
         } catch (ValidationException $exception) {
             $this->assertStringContainsString('belum terkonfirmasi', $exception->getMessage());
         }
-        $this->ingest('result', $this->message('result', ['command_id' => $command->id, 'status' => 'completed', 'duration_ms' => 2000, 'before' => ['food_g' => 800], 'after' => ['food_g' => 775]]));
+        $this->ingest('result', $this->message('result', ['command_id' => $command->id, 'status' => 'completed', 'duration_ms' => 2000, 'before' => ['food_g' => 50], 'after' => ['food_g' => 75]]));
         $this->assertSame('completed', $command->fresh()->status);
         $this->assertNotNull($command->fresh()->timed_out_at);
         $this->assertNotNull($command->fresh()->resolved_at);
@@ -186,6 +186,30 @@ class StationWorkflowTest extends TestCase
         $this->ingest('result', $this->message('result', ['command_id' => $command->id, 'status' => 'completed', 'before' => ['food_valid' => true, 'food_g' => 800], 'after' => ['food_valid' => true, 'food_g' => 800]]));
         $this->assertStringContainsString('Periksa penyaluran', $command->fresh()->reason);
         $this->assertSame('completed', $command->fresh()->status);
+    }
+
+    public function test_bowl_increase_confirms_dispensing_and_full_bowl_is_rejected(): void
+    {
+        $command = app(CommandService::class)->create($this->owner, $this->station, 'water');
+        $this->travel(1)->seconds();
+        $this->ingest('result', $this->message('result', ['command_id' => $command->id, 'status' => 'completed', 'before' => ['water_valid' => true, 'water_pct' => 40], 'after' => ['water_valid' => true, 'water_pct' => 40]]));
+        $this->assertStringContainsString('level air di wadah tidak naik', $command->fresh()->reason);
+
+        $this->travel(11)->seconds();
+        $this->station->update(['telemetry_at' => now(), 'last_seen_at' => now()]);
+        $feed = app(CommandService::class)->create($this->owner, $this->station, 'feed');
+        $this->travel(1)->seconds();
+        $this->ingest('result', $this->message('result', ['command_id' => $feed->id, 'status' => 'completed', 'before' => ['food_valid' => true, 'food_g' => 50], 'after' => ['food_valid' => true, 'food_g' => 75]]));
+        $this->assertNull($feed->fresh()->reason);
+
+        $this->travel(11)->seconds();
+        $this->station->update(['telemetry_at' => now(), 'last_seen_at' => now(), 'snapshot' => ['food_g' => 250, 'water_pct' => 40, 'food_valid' => true, 'water_valid' => true]]);
+        try {
+            app(CommandService::class)->create($this->owner, $this->station, 'feed');
+            $this->fail('Full bowl accepted.');
+        } catch (ValidationException $exception) {
+            $this->assertStringContainsString('Wadah pakan sudah penuh', $exception->getMessage());
+        }
     }
 
     public function test_analytics_averages_valid_sensor_values_only(): void

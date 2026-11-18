@@ -2,7 +2,7 @@
 <div class="login-page">
     <div class="login-story">
         <a href="{{ route('login') }}" class="brand"><span class="brand-mark"><x-icon name="grid"/></span>petstation<span class="brand-period">.</span></a>
-        <div class="login-copy"><span class="eyebrow">KEBUTUHAN KECIL, PERHATIAN SETIAP HARI</span><h1>Selalu dekat.<br>Di mana pun<br>Anda berada.</h1><p>Pantau persediaan pakan dan air, kendalikan station, dan lihat setiap aktivitas dalam satu tempat.</p>
+        <div class="login-copy"><span class="eyebrow">KEBUTUHAN KECIL, PERHATIAN SETIAP HARI</span><h1>Selalu dekat.<br>Di mana pun<br>Anda berada.</h1><p>Pantau isi wadah pakan dan air, kendalikan station, dan lihat setiap aktivitas dalam satu tempat.</p>
             <div class="login-illustration" aria-hidden="true"><div class="vessel food-vessel"><div class="vessel-fill"></div><div class="vessel-line"></div></div><div class="vessel water-vessel"><div class="vessel-fill"></div><div class="vessel-line"></div></div><div class="vessel-base"></div></div>
         </div>
         <span class="login-foot">Smart Pet Feeder & Hydration Station</span>

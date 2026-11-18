@@ -28,27 +28,28 @@ class SimulatorTests(unittest.TestCase):
     def test_duplicate_command_and_restart_never_dispense_twice(self):
         command = self.command()
         self.station.execute(command)
-        self.assertEqual(815, self.station.data['food_g'])
+        self.assertEqual(65, self.station.data['food_g'])
         self.station.execute(command)
-        self.assertEqual(815, self.station.data['food_g'])
+        self.assertEqual(65, self.station.data['food_g'])
         restarted = Station('test-station', 'test', 'test', state_dir=self.directory.name)
         restarted.send = Mock()
         restarted.execute(command)
-        self.assertEqual(815, restarted.data['food_g'])
+        self.assertEqual(65, restarted.data['food_g'])
         self.assertFalse(restarted.busy)
 
-    def test_expired_command_is_rejected_without_changing_reservoir(self):
+    def test_expired_command_is_rejected_without_changing_bowl(self):
         command = self.command()
         command['expires_at'] = (datetime.now(timezone.utc) - timedelta(seconds=1)).isoformat()
         self.station.execute(command)
         self.assertEqual('rejected', self.station.data['processed'][command['command_id']]['status'])
-        self.assertEqual(840, self.station.data['food_g'])
+        self.assertEqual(40, self.station.data['food_g'])
 
-    def test_local_guards_reject_low_water_invalid_sensor_and_duration(self):
-        self.station.data['water_pct'] = 8
+    def test_local_guards_reject_full_bowl_invalid_sensor_and_duration(self):
+        self.station.data['water_pct'] = 95
         command = self.command('water')
         self.station.execute(command)
         self.assertEqual('rejected', self.station.data['processed'][command['command_id']]['status'])
+        self.station.data['water_pct'] = 35
         self.station.data['scenario'] = 'invalid_sensor'
         command = self.command()
         self.station.execute(command)
@@ -57,14 +58,14 @@ class SimulatorTests(unittest.TestCase):
         command = self.command(duration_ms=5000)
         self.station.execute(command)
         self.assertEqual('rejected', self.station.data['processed'][command['command_id']]['status'])
-        self.assertEqual(840, self.station.data['food_g'])
+        self.assertEqual(40, self.station.data['food_g'])
 
     def test_cooldown_blocks_a_new_command_and_outputs_return_to_idle(self):
         self.station.execute(self.command())
         command = self.command()
         self.station.execute(command)
         self.assertEqual('rejected', self.station.data['processed'][command['command_id']]['status'])
-        self.assertEqual(815, self.station.data['food_g'])
+        self.assertEqual(65, self.station.data['food_g'])
         self.assertEqual('closed', self.station.sensors()['servo'])
         self.assertEqual('off', self.station.sensors()['pump'])
 
@@ -72,7 +73,7 @@ class SimulatorTests(unittest.TestCase):
         self.station.data['scenario'] = 'no_result'
         command = self.command()
         self.station.execute(command)
-        self.assertEqual(815, self.station.data['food_g'])
+        self.assertEqual(65, self.station.data['food_g'])
         self.assertFalse(self.station.busy)
         self.assertEqual('completed', self.station.data['processed'][command['command_id']]['status'])
         self.station.send.reset_mock()

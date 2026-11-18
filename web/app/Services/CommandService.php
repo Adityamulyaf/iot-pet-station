@@ -34,10 +34,10 @@ class CommandService
                 $error = 'Station offline atau pembacaan sudah terlambat.';
             } elseif (! ($station->snapshot['food_valid'] ?? false) || ! ($station->snapshot['water_valid'] ?? false)) {
                 $error = 'Sensor tidak valid. Periksa station terlebih dahulu.';
-            } elseif ($action === 'water' && ($station->snapshot['water_pct'] ?? 0) < 20) {
-                $error = 'Level air reservoir terlalu rendah.';
-            } elseif ($action === 'feed' && ($station->snapshot['food_g'] ?? 0) < 30) {
-                $error = 'Persediaan pakan terlalu rendah.';
+            } elseif ($action === 'water' && ($station->snapshot['water_pct'] ?? 0) >= config('station.bowl_water_full_pct')) {
+                $error = 'Wadah air sudah penuh.';
+            } elseif ($action === 'feed' && ($station->snapshot['food_g'] ?? 0) >= config('station.bowl_food_full_g')) {
+                $error = 'Wadah pakan sudah penuh.';
             } elseif (($station->actuators['pump'] ?? 'unknown') !== 'off' || ($station->actuators['servo'] ?? 'unknown') !== 'closed') {
                 $error = 'State aktuator belum memastikan kondisi siap.';
             } elseif ($station->commands()->whereIn('action', ['feed', 'water'])->where('status', 'completed')->where('resolved_at', '>', now()->subSeconds(10))->exists()) {
