@@ -177,7 +177,9 @@ chown root:www-data .env && chmod 640 .env
 
 log "Dependensi dan build aset"
 composer install --no-dev --optimize-autoloader --no-interaction --quiet
-npm ci --no-audit --no-fund --loglevel=error
+# Lockfile memuat dependensi opsional (ink/react) yang tidak lengkap; jika npm ci menolaknya,
+# npm install tetap memakai versi dari lockfile tanpa mengubah file di repository.
+npm ci --no-audit --no-fund --loglevel=error || npm install --no-save --no-audit --no-fund --loglevel=error
 npm run build --silent
 install -d storage/framework/cache/data storage/framework/sessions storage/framework/views storage/logs bootstrap/cache
 chown -R www-data:www-data storage bootstrap/cache
