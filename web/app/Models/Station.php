@@ -13,6 +13,8 @@ class Station extends Model
 
     protected $guarded = ['id'];
 
+    protected $hidden = ['claim_code_hash'];
+
     protected $dateFormat = 'Y-m-d H:i:s.u';
 
     protected function casts(): array

@@ -13,6 +13,7 @@
             <label class="check"><input type="checkbox" name="remember" value="1"> Ingat saya</label>
             <button class="button wide" type="submit">Masuk</button>
         </form>
+        <p class="switch">Belum punya akun? <a href="{{ route('register') }}">Daftar</a></p>
         @if(app()->environment('local'))<p class="demo">Demo: demo@petstation.local / petstation-local</p>@endif
     </div>
 </main>

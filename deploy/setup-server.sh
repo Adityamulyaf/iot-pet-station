@@ -77,6 +77,7 @@ with open(path, 'w') as handle:
     json.dump(data, handle, indent=2)
 PY
 chown root:www-data "$ETC/credentials.json" && chmod 640 "$ETC/credentials.json"
+echo "$DOMAIN" > "$ETC/domain"
 cred() { python3 -c 'import json,sys; d=json.load(open(sys.argv[1]))
 for key in sys.argv[2:]: d=d[key]
 print(d)' "$ETC/credentials.json" "$@"; }
@@ -117,25 +118,7 @@ if [ ! -f "$CERTS/server.crt" ] || ! openssl x509 -in "$CERTS/server.crt" -noout
     -extfile "$ETC/ca/server.ext" -out "$CERTS/server.crt"
 fi
 chown mosquitto:mosquitto "$CERTS"/server.* && chmod 600 "$CERTS/server.key"
-python3 - "$ETC/credentials.json" > /etc/mosquitto/petstation.passwd <<'PY'
-import json, sys
-data = json.load(open(sys.argv[1]))
-print('backend:' + data['backend'])
-for device, password in data['devices'].items():
-    print(device + ':' + password)
-PY
-mosquitto_passwd -U /etc/mosquitto/petstation.passwd
-{
-  printf 'user backend\ntopic read petstation/+/telemetry\ntopic read petstation/+/state\ntopic read petstation/+/result\ntopic write petstation/+/command\ntopic write petstation/+/ack\n\n'
-  for device in $(python3 -c 'import json,sys; print(" ".join(json.load(open(sys.argv[1]))["devices"]))' "$ETC/credentials.json"); do
-    printf 'user %s\n' "$device"
-    for kind in telemetry state result; do printf 'topic write petstation/%s/%s\n' "$device" "$kind"; done
-    for kind in command ack; do printf 'topic read petstation/%s/%s\n' "$device" "$kind"; done
-    printf '\n'
-  done
-} > /etc/mosquitto/petstation.acl
-chown mosquitto:mosquitto /etc/mosquitto/petstation.passwd /etc/mosquitto/petstation.acl
-chmod 600 /etc/mosquitto/petstation.passwd /etc/mosquitto/petstation.acl
+bash "$APP/deploy/broker-sync.sh"
 cat > /etc/mosquitto/conf.d/petstation.conf <<CONF
 allow_anonymous false
 password_file /etc/mosquitto/petstation.passwd
@@ -254,20 +237,7 @@ systemctl enable php8.3-fpm caddy >/dev/null
 systemctl restart php8.3-fpm caddy
 
 log "secrets.h untuk ESP32"
-{
-  echo '// Dibuat oleh deploy/setup-server.sh untuk broker cloud. Jangan di-commit.'
-  echo '#pragma once'
-  echo '#define WIFI_SSID "NAMA_WIFI"'
-  echo '#define WIFI_PASSWORD "PASSWORD_WIFI"'
-  echo "#define MQTT_HOST \"$DOMAIN\""
-  echo '#define MQTT_PORT 8883'
-  echo '#define MQTT_TLS 1'
-  echo '#define DEVICE_ID "station-esp32"'
-  echo "#define MQTT_PASSWORD \"$(cred devices station-esp32)\""
-  echo 'static const char MQTT_CA_CERT[] = R"PEM('
-  cat "$ETC/ca/ca.crt"
-  echo ')PEM";'
-} > "$ETC/firmware-secrets.h"
+bash "$APP/deploy/firmware-secrets.sh" station-esp32 > "$ETC/firmware-secrets.h"
 chmod 600 "$ETC/firmware-secrets.h"
 
 for service in mariadb mosquitto php8.3-fpm caddy petstation-mqtt; do
@@ -281,4 +251,5 @@ Langkah berikutnya (sekali saja):
   sudo -u www-data php $APP/web/artisan station:provision station-001 email@anda.com "Station simulasi 1"
   sudo -u www-data php $APP/web/artisan station:provision station-002 email@anda.com "Station simulasi 2"
 Ambil secrets.h untuk ESP32: sudo cat $ETC/firmware-secrets.h
+Station baru dengan kode klaim: sudo bash $APP/deploy/station-create.sh <device-id> "<nama>" [--physical]
 NEXT

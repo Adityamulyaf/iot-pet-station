@@ -54,7 +54,7 @@ Versi paket ditentukan dan dikunci saat setup setelah kompatibilitas lingkungan 
 | Analytics          | Grafik isi wadah pakan dan level air, jumlah perintah menurut hasil, dan kejadian PIR |
 | Pengaturan station | Nama station serta informasi identitas dan konfigurasi yang relevan                    |
 
-Penambahan station dilakukan melalui mekanisme registrasi/provisioning yang menghubungkan identitas perangkat dengan akun. Bentuk antarmuka provisioning ditentukan saat perancangan detail; kredensial broker tidak ditampilkan ke browser.
+Penambahan station memakai pola kode klaim. Admin mendaftarkan perangkat di server (`deploy/station-create.sh`), yang membuat kredensial broker, ACL, dan kode klaim sekali pakai. Pengguna mendaftar akun sendiri di halaman **Daftar**, lalu memasukkan ID perangkat dan kode klaim di **Tambah station**. Kode disimpan sebagai hash, hangus setelah dipakai, dan percobaan klaim dibatasi lima kali per 10 menit; ID salah dan kode salah menghasilkan pesan yang sama. Pemilik dapat melepas station dari Pengaturan, yang menghapus riwayatnya; klaim berikutnya membutuhkan kode baru (`station:code`). Kredensial broker tidak pernah ditampilkan ke browser.
 
 ### 5.1 Monitoring
 
@@ -205,7 +205,7 @@ Simulator menguji perilaku software; hasilnya tidak membuktikan akurasi sensor a
 - Dashboard polling setiap 5 detik. Data terlambat setelah 15 detik; offline setelah 20 detik tanpa pembacaan/heartbeat baru.
 - Masa berlaku perintah 15 detik; timeout hasil 30 detik. Perintah yang kedaluwarsa sebelum dikirim ditandai gagal. Hasil terlambat direkonsiliasi tanpa menghapus catatan timeout.
 - Siklus pakan/air dari web dibatasi 2 detik; batas lokal simulator 3 detik; cooldown 10 detik. Batas wadah penuh 200 gram pakan dan 90% level air (`BOWL_FOOD_FULL_G`, `BOWL_WATER_FULL_PCT`) merupakan parameter awal, bukan hasil kalibrasi fisik.
-- Akun demo lokal dan dua station simulator dibuat saat setup. Penambahan kepemilikan station tersedia melalui CLI; provisioning kredensial perangkat tambahan masih terpisah.
+- Akun demo lokal dan dua station simulator dibuat saat setup. Di server, akun dibuat lewat halaman Daftar dan station ditambahkan dengan kode klaim; `station:provision` tetap tersedia untuk menetapkan pemilik langsung.
 - Grafik menggunakan rata-rata pembacaan sensor valid dengan rentang 1 jam, 24 jam, atau 7 hari. Waktu ditampilkan dalam Asia/Jakarta.
 
 ## 14. Verifikasi implementasi lokal
@@ -219,7 +219,7 @@ Simulator menguji perilaku software; hasilnya tidak membuktikan akurasi sensor a
 ## 15. Pengembangan berikutnya
 
 - Integrasi firmware ESP32 dan kalibrasi sensor serta aktuator fisik.
-- UI provisioning perangkat dan pengelolaan kredensial yang lebih lengkap.
+- Akses bersama station untuk akun lain (viewer/operator).
 - Penetapan retensi data dan optimasi berdasarkan pengukuran jumlah station.
 - Konfigurasi deployment, HTTPS, MQTT/TLS, sertifikat, serta pengawasan proses server.
 - Penjadwalan dan fitur tambahan tetap mengikuti prioritas pengembangan berikutnya.

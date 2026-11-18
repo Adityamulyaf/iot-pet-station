@@ -5,6 +5,7 @@ namespace App\Livewire;
 use App\Models\Station;
 use App\Models\StationCommand;
 use App\Services\CommandService;
+use App\Services\StationClaimService;
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\DB;
@@ -45,6 +46,13 @@ class StationApp extends Component
 
     public string $notice = '';
 
+    public string $claimDevice = '';
+
+    public string $claimCode = '';
+
+    #[Locked]
+    public bool $confirmRelease = false;
+
     public function mount(?Station $station = null, ?string $section = null): void
     {
         if ($station?->exists) {
@@ -81,6 +89,29 @@ class StationApp extends Component
     {
         $this->confirmation = null;
         $this->detailId = null;
+        $this->confirmRelease = false;
+    }
+
+    public function claim(StationClaimService $claims): void
+    {
+        $this->validate(['claimDevice' => 'required|string|max:80', 'claimCode' => 'required|string|max:20'], [
+            'claimDevice.required' => 'Isi ID perangkat.',
+            'claimCode.required' => 'Isi kode klaim.',
+        ]);
+        $station = $claims->claim(auth()->user(), $this->claimDevice, $this->claimCode, request()->ip());
+        $this->redirectRoute('station', [$station, 'dashboard']);
+    }
+
+    public function askRelease(): void
+    {
+        $this->ownedStation();
+        $this->confirmRelease = true;
+    }
+
+    public function release(StationClaimService $claims): void
+    {
+        $claims->release($this->ownedStation());
+        $this->redirectRoute('stations');
     }
 
     public function send(CommandService $service): void
@@ -158,7 +189,7 @@ class StationApp extends Component
             $commands = $this->section === 'history' ? $query->paginate(12) : $query->limit(5)->get();
             $busy = $station->commands()->whereIn('status', ['pending', 'running', 'timeout'])->whereNull('resolved_at')->exists();
             $cooldown = $station->commands()->whereIn('action', ['feed', 'water'])->where('status', 'completed')->where('resolved_at', '>', now()->subSeconds(10))->exists();
-            if (in_array($this->section, ['dashboard', 'analytics'], true)) {
+            if ($this->section === 'analytics') {
                 $chart = $this->chart($station);
                 $this->dispatch('reservoir-chart', chart: $chart);
             }

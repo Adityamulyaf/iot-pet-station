@@ -28,7 +28,7 @@
         @if(!$station)
             <h1>Station saya</h1>
             <div class="stations">
-                @forelse($stations as $item)
+                @foreach($stations as $item)
                     @php
                         $snap = $item->snapshot ?? [];
                         $itemFood = ($snap['food_valid'] ?? false) ? number_format($snap['food_g'], 0, ',', '.').' g' : '–';
@@ -38,9 +38,18 @@
                         <div class="station-card-top"><h2>{{ $item->name }}</h2><span class="pill {{ $item->online() ? 'on' : 'off' }}">{{ $item->online() ? 'Online' : 'Offline' }}</span></div>
                         <div class="station-card-values"><div>Pakan<strong>{{ $itemFood }}</strong></div><div>Air<strong>{{ $itemWater }}</strong></div></div>
                     </a>
-                @empty
-                    <div class="panel empty">Belum ada station di akun ini.</div>
-                @endforelse
+                @endforeach
+                <section class="station-card add-card">
+                    <h2>Tambah station</h2>
+                    <form wire:submit="claim" class="form">
+                        <label for="claim-device">ID perangkat</label>
+                        <input id="claim-device" wire:model="claimDevice" maxlength="80" autocomplete="off" placeholder="station-esp32">
+                        <label for="claim-code">Kode klaim</label>
+                        <input id="claim-code" wire:model="claimCode" maxlength="20" autocomplete="off" autocapitalize="characters" placeholder="XXXX-XXXX">
+                        @if($errors->hasAny(['claimDevice', 'claimCode']))<p class="form-error" role="alert">{{ $errors->first('claimDevice') ?: $errors->first('claimCode') }}</p>@endif
+                        <button class="button" type="submit" wire:loading.attr="disabled">Tambah</button>
+                    </form>
+                </section>
             </div>
         @else
             @php
@@ -132,6 +141,11 @@
                             <button class="button" type="submit" wire:loading.attr="disabled">Simpan</button>
                         </form>
                     </section>
+                    <section class="panel">
+                        <h2 class="panel-head">Lepas station</h2>
+                        <p class="muted small">Station keluar dari akun ini dan riwayatnya dihapus.</p>
+                        <button class="button danger" wire:click="askRelease">Lepas station</button>
+                    </section>
                     @if($station->simulated && app()->environment('local'))
                         <section class="panel">
                             <h2 class="panel-head">Skenario simulator</h2>
@@ -157,6 +171,19 @@
                 <div class="modal-actions">
                     <button class="button soft" wire:click="cancel" x-ref="cancel">Batal</button>
                     <button class="button" wire:click="send" wire:loading.attr="disabled"><span wire:loading.remove wire:target="send">{{ $confirmation === 'feed' ? 'Beri pakan' : 'Salurkan air' }}</span><span wire:loading wire:target="send">Mengirim…</span></button>
+                </div>
+            </section>
+        </div>
+    @endif
+
+    @if($confirmRelease && $station)
+        <div class="modal-overlay" x-data x-init="$nextTick(() => $refs.cancel.focus())" @keydown.escape.window="$wire.cancel()" wire:key="release-modal">
+            <section class="modal" role="dialog" aria-modal="true" aria-labelledby="release-title" x-trap.inert.noscroll="true">
+                <h2 id="release-title">Lepas {{ $station->name }}?</h2>
+                <p class="muted">Riwayat dan data sensor station ini dihapus. Untuk menambahkannya lagi, kamu perlu kode klaim baru dari admin.</p>
+                <div class="modal-actions">
+                    <button class="button soft" wire:click="cancel" x-ref="cancel">Batal</button>
+                    <button class="button danger" wire:click="release" wire:loading.attr="disabled">Lepas station</button>
                 </div>
             </section>
         </div>

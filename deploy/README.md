@@ -67,6 +67,22 @@ sudo -u www-data php artisan station:provision station-002 email@anda.com "Stati
 
 Buka `https://<domain>` di HP, lalu pilih **Add to Home Screen** supaya tampil seperti aplikasi.
 
+### Station baru dengan kode klaim
+
+Pengguna lain (misalnya dosen) bisa membuat akun sendiri lewat **Daftar** di halaman login. Untuk memberi mereka station, daftarkan perangkatnya di server:
+
+```bash
+sudo bash /var/www/petstation/deploy/station-create.sh station-esp32-2 "Station ESP32 kedua" --physical
+```
+
+Script ini membuat password broker dan ACL untuk perangkat, memuat ulang Mosquitto tanpa memutus perangkat lain, lalu mencetak **kode klaim** seperti `K7Q2-9XMP`. Untuk perangkat fisik, `secrets.h` disimpan di `/etc/petstation/firmware-secrets-<device-id>.h`. Tanpa `--physical`, station simulasi langsung dijalankan.
+
+Pengguna membuka **Station saya > Tambah station**, lalu mengisi ID perangkat dan kode klaim. Kode hanya bisa dipakai sekali. Jika pemilik melepas station dari **Pengaturan**, buat kode baru:
+
+```bash
+sudo -u www-data php /var/www/petstation/web/artisan station:code station-esp32-2
+```
+
 ## 3. Hubungkan ESP32
 
 ```powershell
