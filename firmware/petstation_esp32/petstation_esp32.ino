@@ -25,8 +25,10 @@ const int PIN_PUMP = 26;
 const int PIN_SERVO = 27;
 
 // ---------- aturan lokal (sama dengan simulator) ----------
-const int SERVO_CLOSED_DEG = 0;
-const int SERVO_OPEN_DEG = 90;
+// Sudut servo bisa dikalibrasi lewat Serial (servo/stutup/sbuka) dan disimpan di flash.
+int servoClosedDeg = 0;
+int servoOpenDeg = 90;
+int servoPreviewDeg = 0;
 const uint32_t TELEMETRY_MS = 5000;
 const uint32_t COOLDOWN_MS = 10000;
 const uint32_t MIN_DURATION_MS = 500;
@@ -224,7 +226,7 @@ String snapshotJson() {
 // ---------- aktuator ----------
 void stopActuators() {
   digitalWrite(PIN_PUMP, LOW);
-  servo.write(SERVO_CLOSED_DEG);
+  servo.write(servoClosedDeg);
 }
 
 void startCommand(const String &id, const String &action, uint32_t duration) {
@@ -233,7 +235,7 @@ void startCommand(const String &id, const String &action, uint32_t duration) {
   activeId = id; activeAction = action; activeDuration = duration;
   phase = RUNNING; phaseStart = millis();
   prefs.putString("running", id);   // restart saat berjalan dilaporkan gagal, tidak diulang
-  if (action == "feed") servo.write(SERVO_OPEN_DEG); else digitalWrite(PIN_PUMP, HIGH);
+  if (action == "feed") servo.write(servoOpenDeg); else digitalWrite(PIN_PUMP, HIGH);
   publishResult(id, "running", nullptr, 0, beforeJson);
   publishState();
 }
@@ -289,7 +291,7 @@ void onMessage(char *t, byte *payload, unsigned int len) {
     if (pendingMessageId.length() && pendingMessageId == doc["message_id"].as<String>()) { pendingPayload = ""; pendingMessageId = ""; }
     return;
   }
-  if (doc["device_id"] != DEVICE_ID || doc["schema_version"] != 1) return;
+  if (doc["device_id"].as<String>() != DEVICE_ID || doc["schema_version"].as<int>() != 1) return;
   onCommand(doc);
 }
 
@@ -326,12 +328,14 @@ void ensureNetwork() {
 void saveCalibration() {
   prefs.putLong("hx_off", hxOffset); prefs.putFloat("hx_scale", hxScale);
   prefs.putInt("w_dry", waterDry); prefs.putInt("w_full", waterFull);
+  prefs.putInt("s_closed", servoClosedDeg); prefs.putInt("s_open", servoOpenDeg);
 }
 
 void printInfo() {
   readSensors();
   Serial.printf("Pakan: %.1f g (raw %ld, offset %ld, scale %.3f, valid %d)\n", last.foodG, last.foodRaw, hxOffset, hxScale, last.foodValid);
   Serial.printf("Air: %.1f%% (ADC %d, kering %d, penuh %d, valid %d)\n", last.waterPct, last.waterRaw, waterDry, waterFull, last.waterValid);
+  Serial.printf("Servo: tutup %d, buka %d derajat\n", servoClosedDeg, servoOpenDeg);
   Serial.printf("PIR: %d | WiFi: %s | MQTT: %s | IP: %s\n", digitalRead(PIN_PIR), WiFi.status() == WL_CONNECTED ? "ok" : "putus",
                 mqtt.connected() ? "ok" : "putus", WiFi.localIP().toString().c_str());
 }
@@ -349,8 +353,17 @@ void handleSerial() {
   }
   else if (line == "wkering") { readSensors(); waterDry = last.waterRaw; saveCalibration(); Serial.printf("ADC kering = %d\n", waterDry); }
   else if (line == "wpenuh") { readSensors(); waterFull = last.waterRaw; saveCalibration(); Serial.printf("ADC penuh = %d\n", waterFull); }
+  else if (line.startsWith("servo ")) {
+    // Pratinjau sudut tanpa menyimpan; simpan dengan stutup atau sbuka.
+    int deg = line.substring(6).toInt();
+    if (deg < 0 || deg > 180) { Serial.println("Sudut 0-180."); return; }
+    servoPreviewDeg = deg; servo.write(deg);
+    Serial.printf("Servo di %d derajat. Ketik stutup atau sbuka untuk menyimpan.\n", deg);
+  }
+  else if (line == "stutup") { servoClosedDeg = servoPreviewDeg; saveCalibration(); servo.write(servoClosedDeg); Serial.printf("Sudut tutup = %d\n", servoClosedDeg); }
+  else if (line == "sbuka") { servoOpenDeg = servoPreviewDeg; saveCalibration(); servo.write(servoClosedDeg); Serial.printf("Sudut buka = %d (servo kembali menutup)\n", servoOpenDeg); }
   else if (line == "info") printInfo();
-  else Serial.println("Perintah: info | tare | cal <gram> | wkering | wpenuh");
+  else Serial.println("Perintah: info | tare | cal <gram> | wkering | wpenuh | servo <derajat> | stutup | sbuka");
 }
 
 // ---------- setup / loop ----------
@@ -364,7 +377,6 @@ void setup() {
 
   servo.setPeriodHertz(50);
   servo.attach(PIN_SERVO, 500, 2400);
-  servo.write(SERVO_CLOSED_DEG);
 
   scale.begin(PIN_HX711_DT, PIN_HX711_SCK);
 
@@ -373,6 +385,10 @@ void setup() {
   hxScale = prefs.getFloat("hx_scale", hxScale);
   waterDry = prefs.getInt("w_dry", waterDry);
   waterFull = prefs.getInt("w_full", waterFull);
+  servoClosedDeg = prefs.getInt("s_closed", servoClosedDeg);
+  servoOpenDeg = prefs.getInt("s_open", servoOpenDeg);
+  servoPreviewDeg = servoClosedDeg;
+  servo.write(servoClosedDeg);
   interruptedId = prefs.getString("running", "");
   prefs.remove("running");
 

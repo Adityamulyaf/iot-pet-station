@@ -19,7 +19,7 @@ Firmware `petstation_esp32` memakai kontrak MQTT yang sama dengan `simulator/sta
 - PubSubClient (Nick O'Leary)
 - ArduinoJson 7.x (Benoit Blanchon)
 
-Board: ESP32 Dev Module (paket `esp32` by Espressif).
+Board: ESP32 Dev Module (paket `esp32` by Espressif). Sudah diuji dengan core 2.0.17, yang jauh lebih kecil daripada 3.x (3.x memasang library untuk semua chip ESP32 dan butuh beberapa GB).
 
 ## Langkah
 
@@ -51,8 +51,13 @@ Board: ESP32 Dev Module (paket `esp32` by Espressif).
 | `cal 200` | Letakkan beban acuan (mis. 200 g), hitung faktor skala |
 | `wkering` | Sensor air kering / wadah air kosong |
 | `wpenuh` | Wadah air penuh sampai batas sensor |
+| `servo 120` | Putar servo ke sudut tertentu (0-180) tanpa menyimpan, untuk mencari posisi |
+| `stutup` | Simpan sudut terakhir dari `servo` sebagai posisi tutup |
+| `sbuka` | Simpan sudut terakhir dari `servo` sebagai posisi buka, lalu servo kembali menutup |
 
 Persentase air adalah posisi relatif antara kalibrasi kering dan penuh, bukan persentase volume.
+
+Servo hanya berputar 0-180 derajat. Jika posisi tutup yang pas berada di luar rentang itu, lepas horn atau penutup dari poros, putar servo ke sudut di tengah rentang (mis. `servo 150`), pasang ulang penutup dalam keadaan menutup, lalu simpan dengan `stutup`.
 
 ## Perilaku
 
