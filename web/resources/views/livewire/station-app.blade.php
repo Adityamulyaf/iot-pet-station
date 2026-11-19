@@ -1,6 +1,6 @@
 <div class="app" wire:poll.5s>
     @php
-        $sections = ['dashboard' => 'Dashboard', 'history' => 'Riwayat', 'analytics' => 'Grafik', 'settings' => 'Pengaturan'];
+        $sections = ['dashboard' => 'Dashboard', 'history' => 'Riwayat', 'schedule' => 'Jadwal', 'analytics' => 'Grafik', 'settings' => 'Pengaturan'];
     @endphp
     <header class="top">
         <div class="top-row">
@@ -120,6 +120,48 @@
                     @include('partials.commands')
                     {{ $commands->links('partials.pagination') }}
                 </section>
+            @elseif($section === 'schedule')
+                @if($isOwner)
+                    <section class="panel">
+                        <h2 class="panel-head">Tambah jadwal</h2>
+                        <form wire:submit="addSchedule" class="form schedule-form">
+                            <div class="segmented" role="radiogroup" aria-label="Tindakan">
+                                @foreach(\App\Models\StationSchedule::ACTIONS as $value => $label)
+                                    <label><input type="radio" wire:model="scheduleAction" value="{{ $value }}"><span>{{ $label }}</span></label>
+                                @endforeach
+                            </div>
+                            <label for="schedule-time">Jam (WIB)</label>
+                            <input id="schedule-time" type="time" wire:model="scheduleTime" required>
+                            <div class="day-picks" role="group" aria-label="Hari">
+                                @foreach(\App\Models\StationSchedule::DAYS as $value => $label)
+                                    <label><input type="checkbox" wire:model="scheduleDays" value="{{ $value }}"><span>{{ $label }}</span></label>
+                                @endforeach
+                            </div>
+                            @if($errors->hasAny(['scheduleAction', 'scheduleTime', 'scheduleDays', 'scheduleDays.*']))<p class="form-error" role="alert">{{ $errors->first('scheduleTime') ?: ($errors->first('scheduleDays') ?: $errors->first('scheduleAction')) }}</p>@endif
+                            <button class="button" type="submit" wire:loading.attr="disabled">Simpan jadwal</button>
+                        </form>
+                    </section>
+                @endif
+                <section class="panel">
+                    <h2 class="panel-head">Jadwal</h2>
+                    <ul class="list schedules">
+                        @forelse($schedules as $schedule)
+                            <li wire:key="schedule-{{ $schedule->id }}" class="{{ $schedule->enabled ? '' : 'off' }}">
+                                <span class="chip {{ $schedule->action === 'feed' ? 'food' : 'water' }}"><x-icon :name="$schedule->action === 'feed' ? 'food' : 'water'"/></span>
+                                <span class="list-main"><span class="schedule-time">{{ $schedule->time }}</span> {{ $schedule->actionLabel() }}<small>{{ $schedule->daysLabel() }}@if($schedule->last_run_on) · {{ $schedule->last_run_on->isToday() ? 'Hari ini' : $schedule->last_run_on->translatedFormat('d M') }}: {{ $schedule->last_status === 'sent' ? 'terkirim' : 'dilewati, '.\Illuminate\Support\Str::lcfirst(rtrim($schedule->last_note ?? '', '.')) }}@endif</small></span>
+                                @if($isOwner)
+                                    <button class="pill {{ $schedule->enabled ? 'on' : '' }}" wire:click="toggleSchedule({{ $schedule->id }})" aria-pressed="{{ $schedule->enabled ? 'true' : 'false' }}">{{ $schedule->enabled ? 'Aktif' : 'Mati' }}</button>
+                                    <button class="icon-button" wire:click="deleteSchedule({{ $schedule->id }})" wire:confirm="Hapus jadwal {{ $schedule->time }} {{ $schedule->actionLabel() }}?" aria-label="Hapus jadwal {{ $schedule->time }}"><x-icon name="close"/></button>
+                                @else
+                                    <span class="pill {{ $schedule->enabled ? 'on' : '' }}">{{ $schedule->enabled ? 'Aktif' : 'Mati' }}</span>
+                                @endif
+                            </li>
+                        @empty
+                            <li class="empty">Belum ada jadwal</li>
+                        @endforelse
+                    </ul>
+                    <p class="muted small schedule-note">Jadwal dilewati jika wadah sudah penuh atau station offline.</p>
+                </section>
             @elseif($section === 'analytics')
                 <div class="stats">
                     @foreach(['total' => 'Perintah', 'completed' => 'Selesai', 'unconfirmed' => 'Belum terkonfirmasi', 'motion' => 'Gerakan terdeteksi'] as $key => $label)
@@ -229,7 +271,7 @@
                 <div class="panel-head"><h2 id="detail-title">{{ $detail->actionLabel() }}</h2><button class="icon-button" wire:click="cancel" x-ref="close" aria-label="Tutup"><x-icon name="close"/></button></div>
                 <span class="pill status-{{ $detail->status }}">{{ $detail->label() }}</span>
                 <dl class="details">
-                    @if($detail->user)<div><dt>Oleh</dt><dd>{{ $detail->user->name }}</dd></div>@endif
+                    <div><dt>Oleh</dt><dd>{{ $detail->source === 'schedule' ? 'Jadwal' : ($detail->user?->name ?? '–') }}</dd></div>
                     <div><dt>Waktu</dt><dd>{{ $detail->created_at->timezone('Asia/Jakarta')->format('d/m/Y H:i:s') }}</dd></div>
                     @if(isset($detail->result['duration_ms']))<div><dt>Durasi</dt><dd>{{ $detail->result['duration_ms'] }} ms</dd></div>@endif
                     @foreach(['before' => 'Sebelum', 'after' => 'Sesudah'] as $key => $label)

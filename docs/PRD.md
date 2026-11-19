@@ -58,6 +58,8 @@ Penambahan station memakai pola kode klaim. Admin mendaftarkan perangkat di serv
 
 Pemilik dapat membagikan station ke akun lain yang sudah terdaftar melalui **Pengaturan > Bagikan** dengan peran **Pemantau** (melihat dashboard, riwayat, dan grafik) atau **Operator** (juga mengirim perintah pakan dan air). Mengganti nama, berbagi akses, skenario simulator, dan melepas station hanya untuk pemilik. Hak akses diperiksa pada setiap permintaan melalui policy, sehingga pencabutan langsung berlaku. Riwayat perintah mencatat akun pengirim.
 
+Pemilik dapat membuat jadwal pakan dan air di tab **Jadwal** (jam WIB dan hari). Server memeriksa jadwal setiap menit (`station:run-schedules` lewat `schedule:work`) dan mengirim perintah melalui jalur yang sama dengan tombol web, sehingga semua aturan tetap berlaku. Jika station sibuk atau dalam cooldown, jadwal dicoba lagi hingga 10 menit; jika wadah penuh, station offline, atau sensor tidak valid, jadwal dilewati dan alasannya ditampilkan. Perintah dari jadwal ditandai "Jadwal" di riwayat. Jadwal hanya berjalan saat perangkat online.
+
 ### 5.1 Monitoring
 
 - Berat pakan ditampilkan dalam gram berdasarkan load cell di bawah wadah pakan.

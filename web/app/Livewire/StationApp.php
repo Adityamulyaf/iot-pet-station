@@ -4,6 +4,7 @@ namespace App\Livewire;
 
 use App\Models\Station;
 use App\Models\StationCommand;
+use App\Models\StationSchedule;
 use App\Models\User;
 use App\Services\CommandService;
 use App\Services\StationClaimService;
@@ -58,6 +59,13 @@ class StationApp extends Component
     public string $shareEmail = '';
 
     public string $shareRole = Station::ROLE_VIEWER;
+
+    public string $scheduleAction = 'feed';
+
+    public string $scheduleTime = '07:00';
+
+    /** @var list<int|string> */
+    public array $scheduleDays = [1, 2, 3, 4, 5, 6, 7];
 
     public function mount(?Station $station = null, ?string $section = null): void
     {
@@ -180,6 +188,37 @@ class StationApp extends Component
         $this->notice = "Akses dibagikan ke {$user->name}.";
     }
 
+    public function addSchedule(): void
+    {
+        $station = $this->station('manage');
+        $data = $this->validate([
+            'scheduleAction' => ['required', Rule::in(array_keys(StationSchedule::ACTIONS))],
+            'scheduleTime' => ['required', 'date_format:H:i'],
+            'scheduleDays' => ['required', 'array', 'min:1'],
+            'scheduleDays.*' => ['integer', 'between:1,7'],
+        ], ['scheduleDays.required' => 'Pilih minimal satu hari.', 'scheduleDays.min' => 'Pilih minimal satu hari.', 'scheduleTime.date_format' => 'Format jam tidak valid.']);
+        if ($station->schedules()->count() >= 20) {
+            $this->addError('scheduleTime', 'Maksimal 20 jadwal per station.');
+
+            return;
+        }
+        $days = collect($data['scheduleDays'])->map(fn ($day) => (int) $day)->unique()->sort()->values()->all();
+        $station->schedules()->create(['action' => $data['scheduleAction'], 'time' => $data['scheduleTime'], 'days' => $days]);
+        $this->notice = 'Jadwal ditambahkan.';
+    }
+
+    public function toggleSchedule(int $scheduleId): void
+    {
+        $schedule = $this->station('manage')->schedules()->findOrFail($scheduleId);
+        $schedule->update(['enabled' => ! $schedule->enabled]);
+    }
+
+    public function deleteSchedule(int $scheduleId): void
+    {
+        $this->station('manage')->schedules()->findOrFail($scheduleId)->delete();
+        $this->notice = 'Jadwal dihapus.';
+    }
+
     public function revoke(int $userId): void
     {
         $this->station('manage')->members()->detach($userId);
@@ -219,6 +258,7 @@ class StationApp extends Component
         $station = $this->stationId ? $this->station() : null;
         $role = $station?->roleFor(auth()->user());
         $members = $role === Station::ROLE_OWNER ? $station->members()->orderBy('name')->get() : collect();
+        $schedules = $station && $this->section === 'schedule' ? $station->schedules()->orderBy('time')->orderBy('action')->get() : collect();
         $commands = null;
         $chart = ['labels' => [], 'food' => [], 'water' => []];
         $detail = null;
@@ -250,7 +290,7 @@ class StationApp extends Component
             $detail = $this->detailId ? $station->commands()->findOrFail($this->detailId) : null;
         }
 
-        return view('livewire.station-app', compact('stations', 'station', 'role', 'members', 'commands', 'chart', 'detail', 'stats', 'busy', 'cooldown'))
-            ->layout('components.layouts.app', ['title' => ['dashboard' => 'Dashboard', 'history' => 'Riwayat', 'analytics' => 'Analytics', 'settings' => 'Pengaturan'][$this->section] ?? 'Station']);
+        return view('livewire.station-app', compact('stations', 'station', 'role', 'members', 'schedules', 'commands', 'chart', 'detail', 'stats', 'busy', 'cooldown'))
+            ->layout('components.layouts.app', ['title' => ['dashboard' => 'Dashboard', 'history' => 'Riwayat', 'schedule' => 'Jadwal', 'analytics' => 'Grafik', 'settings' => 'Pengaturan'][$this->section] ?? 'Station']);
     }
 }

@@ -2,57 +2,61 @@
 
 namespace App\Services;
 
+use App\Exceptions\CommandRejected;
 use App\Models\Station;
 use App\Models\StationCommand;
 use App\Models\User;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
-use Illuminate\Validation\ValidationException;
 
 class CommandService
 {
-    public function create(User $user, Station $station, string $action, array $parameters = []): StationCommand
+    /**
+     * @param  'web'|'schedule'  $source
+     *
+     * @throws CommandRejected when the station cannot accept the command right now
+     */
+    public function create(User $user, Station $station, string $action, array $parameters = [], string $source = 'web'): StationCommand
     {
         abort_unless(Gate::forUser($user)->allows($action === 'scenario' ? 'manage' : 'operate', $station), 403);
 
-        return DB::transaction(function () use ($user, $station, $action, $parameters): StationCommand {
+        return DB::transaction(function () use ($user, $station, $action, $parameters, $source): StationCommand {
             $station = Station::query()->lockForUpdate()->findOrFail($station->id);
-            $error = null;
-            if (! in_array($action, ['feed', 'water', 'scenario'], true)) {
-                $error = 'Tindakan tidak dikenal.';
-            } elseif (! Cache::get('mqtt-worker-online')) {
-                $error = 'Layanan perangkat belum terhubung. Coba kembali sebentar lagi.';
-            } elseif ($action !== 'scenario' && $station->commands()->whereIn('status', ['pending', 'running', 'timeout'])->whereNull('resolved_at')->exists()) {
-                $error = 'Perintah sebelumnya belum terkonfirmasi. Tunggu hasil perangkat.';
-            } elseif ($station->commands()->where('created_at', '>', now()->subSeconds(3))->exists()) {
-                $error = 'Tunggu sebentar sebelum mengirim perintah berikutnya.';
-            } elseif ($action === 'scenario') {
-                if (! $station->simulated || ! app()->environment(['local', 'testing']) || ! in_array($parameters['scenario'] ?? '', ['normal', 'low_water', 'invalid_sensor', 'offline', 'delayed', 'no_result', 'duplicate'], true)) {
-                    $error = 'Skenario tidak tersedia untuk station ini.';
-                }
-            } elseif (! $station->online() || ! $station->hasFreshTelemetry()) {
-                $error = 'Station offline atau pembacaan sudah terlambat.';
-            } elseif (! ($station->snapshot['food_valid'] ?? false) || ! ($station->snapshot['water_valid'] ?? false)) {
-                $error = 'Sensor tidak valid. Periksa station terlebih dahulu.';
-            } elseif ($action === 'water' && ($station->snapshot['water_pct'] ?? 0) >= config('station.bowl_water_full_pct')) {
-                $error = 'Wadah air sudah penuh.';
-            } elseif ($action === 'feed' && ($station->snapshot['food_g'] ?? 0) >= config('station.bowl_food_full_g')) {
-                $error = 'Wadah pakan sudah penuh.';
-            } elseif (($station->actuators['pump'] ?? 'unknown') !== 'off' || ($station->actuators['servo'] ?? 'unknown') !== 'closed') {
-                $error = 'State aktuator belum memastikan kondisi siap.';
-            } elseif ($station->commands()->whereIn('action', ['feed', 'water'])->where('status', 'completed')->where('resolved_at', '>', now()->subSeconds(10))->exists()) {
-                $error = 'Cooldown aktif. Tunggu 10 detik setelah eksekusi.';
-            }
+            [$error, $retryable] = $this->blockingReason($station, $action, $parameters);
             if ($error) {
-                throw ValidationException::withMessages(['command' => $error]);
+                throw CommandRejected::because($error, $retryable);
             }
             if ($action !== 'scenario') {
                 $parameters = ['duration_ms' => 2000];
             }
 
-            return $station->commands()->create(['user_id' => $user->id, 'action' => $action, 'parameters' => $parameters, 'expires_at' => now()->addSeconds(15)]);
+            return $station->commands()->create(['user_id' => $user->id, 'action' => $action, 'source' => $source, 'parameters' => $parameters, 'expires_at' => now()->addSeconds(15)]);
         });
+    }
+
+    /**
+     * Why the station cannot take this command, and whether the reason clears by itself within seconds.
+     *
+     * @return array{0: ?string, 1: bool}
+     */
+    private function blockingReason(Station $station, string $action, array $parameters): array
+    {
+        return match (true) {
+            ! in_array($action, ['feed', 'water', 'scenario'], true) => ['Tindakan tidak dikenal.', false],
+            ! Cache::get('mqtt-worker-online') => ['Layanan perangkat belum terhubung. Coba kembali sebentar lagi.', true],
+            $action !== 'scenario' && $station->commands()->whereIn('status', ['pending', 'running', 'timeout'])->whereNull('resolved_at')->exists() => ['Perintah sebelumnya belum terkonfirmasi. Tunggu hasil perangkat.', true],
+            $station->commands()->where('created_at', '>', now()->subSeconds(3))->exists() => ['Tunggu sebentar sebelum mengirim perintah berikutnya.', true],
+            $action === 'scenario' => (! $station->simulated || ! app()->environment(['local', 'testing']) || ! in_array($parameters['scenario'] ?? '', ['normal', 'low_water', 'invalid_sensor', 'offline', 'delayed', 'no_result', 'duplicate'], true))
+                ? ['Skenario tidak tersedia untuk station ini.', false] : [null, false],
+            ! $station->online() || ! $station->hasFreshTelemetry() => ['Station offline atau pembacaan sudah terlambat.', false],
+            ! ($station->snapshot['food_valid'] ?? false) || ! ($station->snapshot['water_valid'] ?? false) => ['Sensor tidak valid. Periksa station terlebih dahulu.', false],
+            $action === 'water' && ($station->snapshot['water_pct'] ?? 0) >= config('station.bowl_water_full_pct') => ['Wadah air sudah penuh.', false],
+            $action === 'feed' && ($station->snapshot['food_g'] ?? 0) >= config('station.bowl_food_full_g') => ['Wadah pakan sudah penuh.', false],
+            ($station->actuators['pump'] ?? 'unknown') !== 'off' || ($station->actuators['servo'] ?? 'unknown') !== 'closed' => ['State aktuator belum memastikan kondisi siap.', true],
+            $station->commands()->whereIn('action', ['feed', 'water'])->where('status', 'completed')->where('resolved_at', '>', now()->subSeconds(10))->exists() => ['Cooldown aktif. Tunggu 10 detik setelah eksekusi.', true],
+            default => [null, false],
+        };
     }
 
     public function expire(): void

@@ -15,5 +15,5 @@ Route::middleware('guest')->group(function (): void {
 Route::middleware('auth')->group(function (): void {
     Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
     Route::get('/stations', StationApp::class)->name('stations');
-    Route::get('/stations/{station}/{section?}', StationApp::class)->where('section', 'dashboard|history|analytics|settings')->name('station');
+    Route::get('/stations/{station}/{section?}', StationApp::class)->where('section', 'dashboard|history|schedule|analytics|settings')->name('station');
 });

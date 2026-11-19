@@ -7,7 +7,7 @@ Semua layanan berjalan di satu VM Ubuntu 24.04:
 | Web (Caddy + PHP-FPM, HTTPS otomatis Let's Encrypt)             | `https://<domain>` dari HP/laptop                  |
 | Broker Mosquitto, TLS                                           | port `8883` untuk ESP32                            |
 | Broker Mosquitto, tanpa TLS                                     | `127.0.0.1:1883`, hanya worker dan simulator di VM |
-| Worker `station:mqtt`, MariaDB, simulator `station-001/002` | systemd, hidup otomatis setelah reboot               |
+| Worker `station:mqtt`, jadwal (`schedule:work`), MariaDB, simulator `station-001/002` | systemd, hidup otomatis setelah reboot               |
 
 Sertifikat broker ditandatangani CA milik sendiri yang dibuat oleh script, lalu CA tersebut ditanam di firmware. Dengan begitu ESP32 memverifikasi server tanpa bergantung pada rantai sertifikat publik.
 
@@ -103,6 +103,7 @@ sudo bash setup-server.sh --domain <domain>
 | -------------------- | ---------------------------------------------------------------------------------- |
 | Status layanan       | `systemctl status petstation-mqtt mosquitto caddy`                               |
 | Log worker MQTT      | `journalctl -u petstation-mqtt -n 50`                                            |
+| Log jadwal           | `journalctl -u petstation-schedule -n 50`                                        |
 | Log HTTPS/sertifikat | `journalctl -u caddy -n 50` (port 80 harus terbuka agar Let's Encrypt berhasil)  |
 | Log Laravel          | `tail -n 50 /var/www/petstation/web/storage/logs/laravel.log`                    |
 | ESP32 `rc=-2`      | Port 8883 belum dibuka di Network Security Group, atau jam ESP32 belum sinkron NTP |

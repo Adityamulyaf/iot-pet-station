@@ -67,6 +67,11 @@ class Station extends Model
         return $this->members()->where('users.id', $user->id)->value('station_user.role');
     }
 
+    public function schedules(): HasMany
+    {
+        return $this->hasMany(StationSchedule::class);
+    }
+
     public function commands(): HasMany
     {
         return $this->hasMany(StationCommand::class);

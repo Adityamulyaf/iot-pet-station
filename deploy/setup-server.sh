@@ -189,6 +189,22 @@ RestartSec=3
 [Install]
 WantedBy=multi-user.target
 UNIT
+cat > /etc/systemd/system/petstation-schedule.service <<UNIT
+[Unit]
+Description=Petstation jadwal pakan dan air
+After=network-online.target mariadb.service petstation-mqtt.service
+
+[Service]
+User=www-data
+Group=www-data
+WorkingDirectory=$APP/web
+ExecStart=/usr/bin/php artisan schedule:work
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+UNIT
 cat > /etc/systemd/system/petstation-sim@.service <<UNIT
 [Unit]
 Description=Petstation simulator %i
@@ -208,6 +224,7 @@ WantedBy=multi-user.target
 UNIT
 systemctl daemon-reload
 systemctl enable petstation-mqtt >/dev/null && systemctl restart petstation-mqtt
+systemctl enable petstation-schedule >/dev/null && systemctl restart petstation-schedule
 if [ "$SIMULATOR" -eq 1 ]; then
   [ -x "$APP/.venv/bin/python" ] || python3 -m venv "$APP/.venv"
   "$APP/.venv/bin/pip" install -q -r "$APP/simulator/requirements.txt"
@@ -240,7 +257,7 @@ log "secrets.h untuk ESP32"
 bash "$APP/deploy/firmware-secrets.sh" station-esp32 > "$ETC/firmware-secrets.h"
 chmod 600 "$ETC/firmware-secrets.h"
 
-for service in mariadb mosquitto php8.3-fpm caddy petstation-mqtt; do
+for service in mariadb mosquitto php8.3-fpm caddy petstation-mqtt petstation-schedule; do
   systemctl is-active --quiet "$service" || { echo "Layanan $service tidak berjalan. Periksa: journalctl -u $service -n 50" >&2; exit 1; }
 done
 log "Selesai: https://$DOMAIN"
