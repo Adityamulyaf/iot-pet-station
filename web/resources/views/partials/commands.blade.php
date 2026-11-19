@@ -1,6 +1,6 @@
 <ul class="list">
 @forelse($commands as $command)
-    <li wire:key="command-{{ $command->id }}"><button wire:click="showDetail('{{ $command->id }}')">
+    <li wire:key="command-{{ $command->id }}"><button class="row" wire:click="showDetail('{{ $command->id }}')">
         <span class="chip {{ ['feed'=>'food','water'=>'water'][$command->action] ?? 'scenario' }}"><x-icon :name="['feed'=>'food','water'=>'water','scenario'=>'settings'][$command->action] ?? 'clock'"/></span>
         <span class="list-main">{{ $command->actionLabel() }}<small>{{ $command->created_at->timezone('Asia/Jakarta')->translatedFormat('d M, H:i') }}@if($command->source === 'schedule') · Jadwal @endif</small></span>
         <span class="pill status-{{ $command->status }}">{{ $command->label() }}</span>

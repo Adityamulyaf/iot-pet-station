@@ -116,8 +116,8 @@ label { display: block; font-weight: 700; font-size: 14px; margin-bottom: 6px; }
 
 /* Daftar perintah */
 .list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
-.list button { width: 100%; display: flex; align-items: center; gap: 12px; padding: 10px; border: 0; border-radius: 14px; background: transparent; text-align: left; }
-.list button:hover { background: var(--cream); }
+.list .row { width: 100%; display: flex; align-items: center; gap: 12px; padding: 10px; border: 0; border-radius: 14px; background: transparent; text-align: left; }
+.list .row:hover { background: var(--cream); }
 .chip { display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; border-radius: 50%; flex-shrink: 0; }
 .chip.food { background: var(--butter); }
 .chip.water { background: var(--sky); }
